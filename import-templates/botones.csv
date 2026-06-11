@@ -1,0 +1,4 @@
+nombre;url;tipo;seccion;icono;orden;activo
+Registrar Clase;https://ejemplo.com/registro-clase;externo;Académico;🎵;1;si
+Calendario;https://ejemplo.com/calendario;externo;Operación;📅;2;si
+Novedades Nómina;https://ejemplo.com/nomina;externo;Admin;📝;3;si

@@ -1,0 +1,36 @@
+{
+  "usuarios": [
+    {
+      "nombre": "Camila Rodríguez",
+      "email": "camila@imusicala.com",
+      "rol": "asistente",
+      "botones": "registrar-clase, calendario",
+      "activo": "no"
+    }
+  ],
+  "botones": [
+    {
+      "nombre": "Registrar Clase",
+      "url": "https://ejemplo.com/registro-clase",
+      "tipo": "externo",
+      "seccion": "Académico",
+      "icono": "🎵",
+      "orden": 1,
+      "activo": "si"
+    }
+  ],
+  "horario": [
+    {
+      "dia": "Lunes",
+      "hora inicio": "09:00",
+      "hora fin": "10:00",
+      "asistente": "Camila Rodríguez",
+      "email": "camila@imusicala.com",
+      "tarea": "Programación de clases",
+      "descripcion": "Revisar cambios y estudiantes pendientes",
+      "nota": "Priorizar novedades",
+      "color": "azul",
+      "activo": "si"
+    }
+  ]
+}

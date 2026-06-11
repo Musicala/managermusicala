@@ -1,0 +1,21 @@
+{
+  "name": "musicala-manager-firebase",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "deploy": "firebase deploy --only hosting,firestore:rules,firestore:indexes"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "firebase": "latest",
+    "vite": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "lucide-react": "latest"
+  },
+  "devDependencies": {}
+}
