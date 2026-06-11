@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Globe } from 'lucide-react';
 import { loginWithGoogle } from '../services/authService';
+import { assetUrl } from '../utils/assets';
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
@@ -22,7 +23,7 @@ export default function LoginScreen() {
     <div className="login-layout">
       <section className="login-hero">
         <div className="hero-badge">
-          <img src="/logo.png" alt="Musicala" />
+          <img src={assetUrl('logo.png')} alt="Musicala" />
           <span>Musicala</span>
         </div>
         <h1>Musicala Manager</h1>
@@ -33,7 +34,7 @@ export default function LoginScreen() {
 
       <section className="login-card">
         <div className="card-header">
-          <img className="brand-logo-img large" src="/logo.png" alt="Musicala" />
+          <img className="brand-logo-img large" src={assetUrl('logo.png')} alt="Musicala" />
           <div>
             <h2>Ingresar</h2>
             <p>Usa tu cuenta de Google autorizada por Musicala.</p>

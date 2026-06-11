@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { LogOut, UserCheck } from 'lucide-react';
 import { listenAssistantAccounts, resolveAssistantProfile } from '../services/assistantAccountsService';
 import { logout } from '../services/authService';
+import { assetUrl } from '../utils/assets';
 
 export default function AssistantIdentityScreen({ authUser, onSelect }) {
   const [accounts, setAccounts] = useState([]);
@@ -34,7 +35,7 @@ export default function AssistantIdentityScreen({ authUser, onSelect }) {
     <div className="center-shell">
       <section className="login-card identity-card">
         <div className="card-header">
-          <img className="brand-logo-img large" src="/logo.png" alt="Musicala" />
+          <img className="brand-logo-img large" src={assetUrl('logo.png')} alt="Musicala" />
           <div>
             <h2>Elegir usuario</h2>
             <p>Entraste con el correo compartido. Ahora selecciona quien esta trabajando.</p>

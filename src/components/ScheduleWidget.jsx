@@ -3,6 +3,7 @@ import { Bell, Coffee, Timer } from 'lucide-react';
 import { calculateBreaks, getNextBreak, isLunchItem } from '../utils/breaks';
 import { getTodayName, nowMinutes, timeToMinutes, durationLabel } from '../utils/time';
 import { scheduleItemMatchesAssistant } from '../utils/normalize';
+import { assetUrl } from '../utils/assets';
 
 export default function ScheduleWidget({ schedule, user, settings = {} }) {
   const [tick, setTick] = useState(Date.now());
@@ -99,7 +100,7 @@ export default function ScheduleWidget({ schedule, user, settings = {} }) {
     const message = buildNotificationMessage(settings, type, target, data, type === 'taskChange' ? changeLead : startLead);
     new Notification(message.title, {
       body: message.body,
-      icon: '/logo.png'
+      icon: assetUrl('logo.png')
     });
     if (settings.soundEnabled) playSoftPing();
   }, [data, settings, user?.role]);

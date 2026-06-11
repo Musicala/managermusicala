@@ -9,6 +9,7 @@ import { listenSchedule } from './services/scheduleService';
 import { listenUsers } from './services/usersService';
 import { DEFAULT_MANAGER_SETTINGS, listenManagerSettings } from './services/managerConfigService';
 import { ROLES, getInitials, normalizeKey, normalizeText } from './utils/normalize';
+import { assetUrl } from './utils/assets';
 import LoginScreen from './components/LoginScreen';
 import AssistantIdentityScreen from './components/AssistantIdentityScreen';
 import ButtonGrid from './components/ButtonGrid';
@@ -189,7 +190,7 @@ export default function App() {
     <div className="app-shell">
       <header className="topbar">
         <div className="brand-block">
-          <img className="brand-logo-img" src="/logo.png" alt="Musicala" />
+          <img className="brand-logo-img" src={assetUrl('logo.png')} alt="Musicala" />
           <div>
             <strong>Musicala Manager</strong>
             <span>Firebase</span>
@@ -299,7 +300,7 @@ function LoadingScreen({ text }) {
   return (
     <div className="center-shell">
       <div className="loader-card">
-        <img className="loading-logo" src="/logo.png" alt="Musicala" />
+        <img className="loading-logo" src={assetUrl('logo.png')} alt="Musicala" />
         <div className="loader" />
         <p>{text}</p>
       </div>
