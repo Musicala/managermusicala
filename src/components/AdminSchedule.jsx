@@ -9,7 +9,7 @@ import { DayTabs, TimelineCard } from './AssistantSchedule';
 import TaskModal from './TaskModal';
 
 export default function AdminSchedule({ schedule, users, settings }) {
-  const [day, setDay] = useState('Lunes');
+  const [day, setDay] = useState(() => DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1] || 'Lunes');
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [savingScenario, setSavingScenario] = useState(false);
