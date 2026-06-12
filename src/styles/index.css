@@ -141,7 +141,28 @@ input:focus, select:focus, textarea:focus { border-color: var(--vivaldi); backgr
 .timeline-card.color-naranja { border-left-color: var(--warning); background: #fff7ed; color: #9a3412; }
 .timeline-card.color-rosado { border-left-color: var(--brahms); background: #fdf2f8; color: #9d174d; }
 .timeline-card.color-gris { border-left-color: #64748b; background: #f8fafc; color: #334155; }
-.break-card { border-left-style: dashed; z-index: 4; opacity: .95; }
+.break-card {
+  left: auto;
+  right: 14px;
+  width: min(240px, calc(100% - 28px));
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  padding: 7px 12px;
+  border: 1px solid #86efac;
+  border-left: 4px solid var(--success);
+  border-radius: 999px;
+  background: rgba(240,253,244,.94);
+  color: #166534;
+  box-shadow: 0 8px 20px rgba(22,163,74,.12);
+}
+.break-card strong {
+  font-size: .78rem;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .timeline-empty { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 8px; text-align: center; color: var(--muted); padding: 20px; }
 .admin-timeline-scroll { overflow-x: auto; padding: 18px 22px 22px; }
 .admin-timeline-grid { display: grid; gap: 10px; min-width: 860px; align-items: start; }

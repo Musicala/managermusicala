@@ -73,16 +73,20 @@ export function TimelineCard({ item, onClick }) {
   const isBreak = item.type === 'break';
   const style = blockStyle(item.startTime, item.endTime || item.startTime);
   const minutes = item.endTime ? timeToMinutes(item.endTime) - timeToMinutes(item.startTime) : 15;
+  const cardStyle = isBreak
+    ? { ...style, height: '34px', minHeight: '34px' }
+    : { ...style, minHeight: style.height };
+
   return (
     <button
       className={`timeline-card color-${item.color || (isBreak ? 'verde' : 'azul')} ${isBreak ? 'break-card' : ''}`}
-      style={{ ...style, minHeight: isBreak ? '42px' : style.height }}
+      style={cardStyle}
       onClick={onClick}
       type="button"
     >
-      <strong>{item.task}</strong>
-      <span>{item.startTime}{item.endTime ? ` - ${item.endTime}` : ''}</span>
-      {item.description && <small>{item.description}</small>}
+      <strong>{isBreak ? `${item.task} · ${item.startTime}` : item.task}</strong>
+      {!isBreak && <span>{item.startTime}{item.endTime ? ` - ${item.endTime}` : ''}</span>}
+      {!isBreak && item.description && <small>{item.description}</small>}
       {minutes > 0 && !isBreak && <em>{minutes} min</em>}
     </button>
   );
