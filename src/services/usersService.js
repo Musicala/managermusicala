@@ -14,6 +14,7 @@ import { emailKey, normalizeButtonAccess, normalizeRole, normalizeText } from '.
 export function listenUsers(callback) {
   if (!db) return () => {};
   const state = { users: [], invites: [], legacy: [], assistantAccounts: [] };
+  const syncedAssistantAccountAccess = new Set();
 
   const emit = () => {
     const merged = new Map();
@@ -31,10 +32,21 @@ export function listenUsers(callback) {
         ].filter(Boolean);
         return rowKeys.some(key => accountKeys.includes(key));
       });
+      const legacyAccess = Array.isArray(permissions?.buttonAccess) ? permissions.buttonAccess : [];
+      if (legacyAccess.length && !Array.isArray(account.buttonAccess) && !syncedAssistantAccountAccess.has(account.id)) {
+        syncedAssistantAccountAccess.add(account.id);
+        setDoc(appDoc(db, 'assistantAccounts', account.id), {
+          buttonAccess: legacyAccess,
+          updatedAt: serverTimestamp()
+        }, { merge: true }).catch(() => {
+          syncedAssistantAccountAccess.delete(account.id);
+        });
+      }
 
       merged.set(`assistantAccount:${account.id}`, {
         ...permissions,
         ...account,
+        buttonAccess: Array.isArray(account.buttonAccess) ? account.buttonAccess : legacyAccess,
         id: account.id,
         source: 'assistantAccount',
         hasAuthProfile: false,
