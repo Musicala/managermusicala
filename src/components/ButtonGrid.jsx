@@ -5,7 +5,14 @@ export default function ButtonGrid({ buttons, search }) {
   const query = normalizeKey(search);
   const filtered = buttons.filter(button => {
     if (!query) return true;
-    return [button.name, button.section, button.type, button.url].some(value => normalizeKey(value).includes(query));
+    const searchableText = [
+      button.name,
+      button.section,
+      button.type,
+      button.description,
+      button.notes
+    ].map(normalizeKey).join(' ');
+    return searchableText.includes(query);
   });
 
   const sections = filtered.reduce((acc, button) => {
