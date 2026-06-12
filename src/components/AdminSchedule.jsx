@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Briefcase, CheckCircle2, Circle, Clock, Link2, Plus, Wand2 } from 'lucide-react';
 import { saveScheduleTask, deleteScheduleTask, shiftScheduleTasks } from '../services/scheduleService';
 import { DEFAULT_MANAGER_SETTINGS, listenTaskTemplates, saveManagerSettings } from '../services/managerConfigService';
-import { connectHub, fetchHubSchedules, hubScheduleForDay, listenHubUser, matchHubMember } from '../services/hubService';
+import { connectHub, hubScheduleForDay, listenHubSchedules, listenHubUser, matchHubMember } from '../services/hubService';
 import { DAYS, normalizeKey, scheduleItemMatchesAssistant } from '../utils/normalize';
 import { TIMELINE_END, TIMELINE_START, SLOT_HEIGHT, durationLabel, minutesToTime, sortSchedule, timeToMinutes } from '../utils/time';
 import { DayTabs, TimelineCard } from './AssistantSchedule';
@@ -46,20 +46,19 @@ export default function AdminSchedule({ schedule, users, settings }) {
       setHubData(null);
       return;
     }
-    let cancelled = false;
     setHubLoading(true);
     setHubError('');
-    fetchHubSchedules()
-      .then(data => { if (!cancelled) setHubData(data); })
-      .catch(err => {
-        if (cancelled) return;
+    const unsubscribe = listenHubSchedules(data => {
+      setHubData(data);
+      setHubLoading(false);
+    }, err => {
         setHubData(null);
+        setHubLoading(false);
         setHubError(err?.code === 'permission-denied'
           ? `La cuenta ${hubUser} no es administradora del Admin Hub.`
           : 'No se pudieron leer los horarios del Admin Hub.');
-      })
-      .finally(() => { if (!cancelled) setHubLoading(false); });
-    return () => { cancelled = true; };
+    });
+    return unsubscribe;
   }, [hubUser]);
 
   async function handleConnectHub() {

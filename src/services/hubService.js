@@ -13,7 +13,7 @@ import {
   signInWithPopup,
   signOut
 } from 'firebase/auth';
-import { collection, getDocs, getFirestore, query, where } from 'firebase/firestore';
+import { collection, getDocs, getFirestore, onSnapshot, query, where } from 'firebase/firestore';
 import { normalizeKey } from '../utils/normalize';
 
 const HUB_CONFIG = {
@@ -119,6 +119,57 @@ export async function fetchHubSchedules() {
   return { members, overrides, weekDates };
 }
 
+export function listenHubSchedules(callback, onError) {
+  const db = hubDb();
+  const weekDates = currentWeekDates();
+  const state = { members: null, overrides: null };
+
+  const emit = () => {
+    if (!state.members || !state.overrides) return;
+    callback({
+      members: state.members,
+      overrides: state.overrides,
+      weekDates
+    });
+  };
+
+  const unsubMembers = onSnapshot(collection(db, 'adminMemberSettings'), snap => {
+    state.members = snap.docs
+      .map(docSnap => docSnap.data())
+      .filter(member => member?.email)
+      .map(member => ({
+        email: String(member.email).toLowerCase().trim(),
+        name: member.name || '',
+        active: member.active !== false,
+        weeklySchedule: member.weeklySchedule || {}
+      }));
+    emit();
+  }, error => {
+    if (onError) onError(error);
+  });
+
+  const unsubOverrides = onSnapshot(query(
+    collection(db, 'adminScheduleOverrides'),
+    where('date', 'in', Object.values(weekDates))
+  ), snap => {
+    const overrides = {};
+    snap.forEach(docSnap => {
+      const data = docSnap.data();
+      const email = String(data?.email || '').toLowerCase().trim();
+      if (email && data?.date) overrides[`${email}__${data.date}`] = { id: docSnap.id, ...data };
+    });
+    state.overrides = overrides;
+    emit();
+  }, error => {
+    if (onError) onError(error);
+  });
+
+  return () => {
+    unsubMembers();
+    unsubOverrides();
+  };
+}
+
 // Jornada esperada de un miembro del Hub para un día de la semana actual.
 // Prioridad (igual que el Hub): excepción por fecha -> horario semanal -> null.
 export function hubScheduleForDay(member, dayName, overrides, weekDates) {
@@ -127,7 +178,12 @@ export function hubScheduleForDay(member, dayName, overrides, weekDates) {
   const override = date ? overrides?.[`${member.email}__${date}`] : null;
   if (override) {
     if (override.enabled === false) return null;
-    return { start: override.start, end: override.end, source: 'excepción', reason: override.reason || '' };
+    return {
+      start: override.start || override.startTime,
+      end: override.end || override.endTime,
+      source: 'excepción',
+      reason: override.reason || ''
+    };
   }
   const day = member.weeklySchedule?.[WEEKDAY_KEY_BY_DAY[dayName]];
   if (!day || !day.enabled) return null;
