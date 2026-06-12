@@ -7,6 +7,7 @@ import { assetUrl } from '../utils/assets';
 
 export default function ScheduleWidget({ schedule, user, settings = {} }) {
   const [tick, setTick] = useState(Date.now());
+  const [inAppNotifications, setInAppNotifications] = useState(() => readStoredNotifications(user));
   const [notificationPermission, setNotificationPermission] = useState(() => {
     if (typeof Notification === 'undefined') return 'unsupported';
     return Notification.permission;
@@ -25,6 +26,10 @@ export default function ScheduleWidget({ schedule, user, settings = {} }) {
     const permission = await Notification.requestPermission();
     setNotificationPermission(permission);
   }
+
+  useEffect(() => {
+    setInAppNotifications(readStoredNotifications(user));
+  }, [user?.id, user?.uid, user?.email]);
 
   const data = useMemo(() => {
     const day = getTodayName(new Date(tick));
@@ -53,7 +58,6 @@ export default function ScheduleWidget({ schedule, user, settings = {} }) {
 
   useEffect(() => {
     if (user?.role === 'admin' || !settings.notificationsEnabled) return;
-    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
 
     const startLead = Number(settings.taskStartMinutesBefore || 5);
     const changeLead = Number(settings.taskChangeMinutesBefore || 3);
@@ -98,76 +102,124 @@ export default function ScheduleWidget({ schedule, user, settings = {} }) {
     if (window.__managerLastNotification === key) return;
     window.__managerLastNotification = key;
     const message = buildNotificationMessage(settings, type, target, data, type === 'taskChange' ? changeLead : startLead);
-    new Notification(message.title, {
-      body: message.body,
-      icon: assetUrl('logo.png')
+    deliverNotification({
+      key,
+      message,
+      type,
+      target,
+      settings,
+      user,
+      addInAppNotification: notification => {
+        setInAppNotifications(current => storeNotifications(user, [notification, ...current]));
+      }
     });
-    if (settings.soundEnabled) playSoftPing();
-  }, [data, settings, user?.role]);
+  }, [data, settings, user]);
+
+  function dismissNotification(id) {
+    setInAppNotifications(current => storeNotifications(user, current.filter(item => item.id !== id)));
+  }
+
+  function testNotification() {
+    const target = data.nextTask || data.current || data.nextBreak || data.firstTask || { task: 'Prueba de aviso', startTime: '--:--' };
+    const type = data.nextBreak && !data.nextTask ? 'break' : 'taskStart';
+    const message = buildNotificationMessage(settings, type, target, data, Number(settings.taskStartMinutesBefore || 5));
+    deliverNotification({
+      key: `test-${Date.now()}`,
+      message,
+      type,
+      target,
+      settings,
+      user,
+      forceSound: true,
+      addInAppNotification: notification => {
+        setInAppNotifications(current => storeNotifications(user, [notification, ...current]));
+      }
+    });
+  }
 
   if (user?.role === 'admin') {
     return (
-      <section className="widget-grid admin-note">
-        <div className="widget-card compact">
-          <Timer size={22} />
-          <div>
-            <strong>Modo administrador</strong>
-            <span>Gestiona horarios, usuarios, importacion y herramientas.</span>
+      <>
+        <section className="widget-grid admin-note">
+          <div className="widget-card compact">
+            <Timer size={22} />
+            <div>
+              <strong>Modo administrador</strong>
+              <span>Gestiona horarios, usuarios, importacion y herramientas.</span>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+        <NotificationStack notifications={inAppNotifications} onDismiss={dismissNotification} />
+      </>
     );
   }
 
   return (
-    <section className="widget-grid">
-      {settings.notificationsEnabled && notificationPermission !== 'granted' && (
-        <div className="widget-card compact">
+    <>
+      <section className="widget-grid">
+        {settings.notificationsEnabled && notificationPermission !== 'granted' && (
+          <div className="widget-card compact">
+            <Bell size={24} />
+            <div>
+              <span>Notificaciones</span>
+              <strong>{notificationPermission === 'denied' ? 'Permiso bloqueado' : 'Activar avisos'}</strong>
+              <small>
+                {notificationPermission === 'denied'
+                  ? 'Habilitalas desde el navegador para recibir recordatorios.'
+                  : 'Acepta el permiso para recibir inicio, almuerzo, pausas y final de jornada.'}
+              </small>
+            </div>
+            {notificationPermission !== 'denied' && (
+              <button className="btn ghost small" type="button" onClick={requestNotificationPermission}>
+                Activar
+              </button>
+            )}
+          </div>
+        )}
+
+        {user?.previewing && (
+          <div className="widget-card compact">
+            <Bell size={24} />
+            <div>
+              <span>Vista asistente</span>
+              <strong>Probar aviso</strong>
+              <small>Reproduce el sonido y deja el mensaje en pantalla.</small>
+            </div>
+            <button className="btn ghost small" type="button" onClick={testNotification}>
+              Probar
+            </button>
+          </div>
+        )}
+
+        <div className="widget-card">
+          <Timer size={24} />
+          <div>
+            <span>Ahora</span>
+            <strong>{data.current ? data.current.task : 'Sin tarea activa'}</strong>
+            <small>{data.current ? `${data.current.startTime} - ${data.current.endTime}` : data.day}</small>
+          </div>
+        </div>
+
+        <div className="widget-card">
           <Bell size={24} />
           <div>
-            <span>Notificaciones</span>
-            <strong>{notificationPermission === 'denied' ? 'Permiso bloqueado' : 'Activar avisos'}</strong>
-            <small>
-              {notificationPermission === 'denied'
-                ? 'Habilitalas desde el navegador para recibir recordatorios.'
-                : 'Acepta el permiso para recibir inicio, almuerzo, pausas y final de jornada.'}
-            </small>
+            <span>Proxima tarea</span>
+            <strong>{data.nextTask ? data.nextTask.task : 'Nada pendiente'}</strong>
+            <small>{data.nextTask ? `${data.nextTask.startTime} - falta ${durationLabel(timeToMinutes(data.nextTask.startTime) - data.currentMinute)}` : 'Respira, raro pero posible'}</small>
           </div>
-          {notificationPermission !== 'denied' && (
-            <button className="btn ghost small" type="button" onClick={requestNotificationPermission}>
-              Activar
-            </button>
-          )}
         </div>
-      )}
 
-      <div className="widget-card">
-        <Timer size={24} />
-        <div>
-          <span>Ahora</span>
-          <strong>{data.current ? data.current.task : 'Sin tarea activa'}</strong>
-          <small>{data.current ? `${data.current.startTime} - ${data.current.endTime}` : data.day}</small>
+        <div className="widget-card">
+          <Coffee size={24} />
+          <div>
+            <span>Pausa activa</span>
+            <strong>{data.nextBreak ? data.nextBreak.startTime : 'Sin pausa cercana'}</strong>
+            <small>{data.breaks.length ? `${data.breaks.length} calculada(s) hoy` : 'No hay bloque continuo largo'}</small>
+          </div>
         </div>
-      </div>
-
-      <div className="widget-card">
-        <Bell size={24} />
-        <div>
-          <span>Proxima tarea</span>
-          <strong>{data.nextTask ? data.nextTask.task : 'Nada pendiente'}</strong>
-          <small>{data.nextTask ? `${data.nextTask.startTime} - falta ${durationLabel(timeToMinutes(data.nextTask.startTime) - data.currentMinute)}` : 'Respira, raro pero posible'}</small>
-        </div>
-      </div>
-
-      <div className="widget-card">
-        <Coffee size={24} />
-        <div>
-          <span>Pausa activa</span>
-          <strong>{data.nextBreak ? data.nextBreak.startTime : 'Sin pausa cercana'}</strong>
-          <small>{data.breaks.length ? `${data.breaks.length} calculada(s) hoy` : 'No hay bloque continuo largo'}</small>
-        </div>
-      </div>
-    </section>
+      </section>
+      <NotificationStack notifications={inAppNotifications} onDismiss={dismissNotification} />
+    </>
   );
 }
 
@@ -197,6 +249,80 @@ function buildNotificationMessage(settings, type, target, data, minutes) {
     title: apply(template.title || defaults[type]?.title || 'Recordatorio'),
     body: apply(template.body || defaults[type]?.body || '{hora} - {tarea}')
   };
+}
+
+function deliverNotification({ key, message, type, target, settings, user, addInAppNotification, forceSound = false }) {
+  const notification = {
+    id: `${key}-${Date.now()}`,
+    key,
+    type,
+    title: message.title,
+    body: message.body,
+    task: target?.task || '',
+    time: target?.startTime || '',
+    createdAt: Date.now()
+  };
+  addInAppNotification(notification);
+
+  if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    new Notification(message.title, {
+      body: message.body,
+      icon: assetUrl('logo.png')
+    });
+  }
+  if ((settings.soundEnabled || forceSound) && user?.role !== 'admin') playSoftPing();
+}
+
+function NotificationStack({ notifications, onDismiss }) {
+  if (!notifications.length) return null;
+  return (
+    <div className="notification-stack" aria-live="polite">
+      {notifications.map(notification => (
+        <article className={`notification-toast type-${notification.type || 'default'}`} key={notification.id}>
+          <div>
+            <span>{formatNotificationTime(notification.createdAt)}</span>
+            <strong>{notification.title}</strong>
+            <p>{notification.body}</p>
+          </div>
+          <button type="button" onClick={() => onDismiss(notification.id)}>
+            Entendido
+          </button>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function readStoredNotifications(user) {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(notificationStorageKey(user));
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function storeNotifications(user, notifications) {
+  const next = notifications.slice(0, 12);
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(notificationStorageKey(user), JSON.stringify(next));
+    } catch {
+      // La pila visual sigue funcionando aunque localStorage no esté disponible.
+    }
+  }
+  return next;
+}
+
+function notificationStorageKey(user) {
+  return `managerNotifications:${user?.id || user?.uid || user?.email || 'anon'}`;
+}
+
+function formatNotificationTime(value) {
+  const date = new Date(value || Date.now());
+  return date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
 }
 
 function playSoftPing() {
