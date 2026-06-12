@@ -56,11 +56,20 @@ export async function ensureCurrentUserProfile(user) {
   if (snap.exists()) {
     const changes = {
       lastLoginAt: serverTimestamp(),
-      ...(isOfficialAdmin ? { role: ROLES.ADMIN, active: true, pending: false, buttonAccess: ['*'] } : {}),
-      ...(isSharedAssistant ? { role: ROLES.ASISTENTE, active: false, pending: true, sharedAssistantLogin: true } : {})
+      ...(isOfficialAdmin ? { role: ROLES.ADMIN, active: true, pending: false, buttonAccess: ['*'] } : {})
     };
     await updateDoc(ref, changes);
-    return { id: snap.id, ...snap.data(), ...changes };
+    const existing = { id: snap.id, ...snap.data(), ...changes };
+    if (isSharedAssistant) {
+      return {
+        ...existing,
+        role: ROLES.ASISTENTE,
+        active: false,
+        pending: true,
+        sharedAssistantLogin: true
+      };
+    }
+    return existing;
   }
 
   const profile = {

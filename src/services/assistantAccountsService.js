@@ -50,15 +50,21 @@ export function buildAssistantProfile(account, authUser) {
   };
 }
 
-export async function resolveAssistantProfile(account, authUser) {
+export async function resolveAssistantProfile(account, authUser, options = {}) {
   const profile = buildAssistantProfile(account, authUser);
-  if (!db) return profile;
+  if (!db || options.skipRestrictedLookups) return profile;
 
-  const sources = [
-    await getDocs(appCollection(db, 'userInvites')),
-    await getDocs(appCollection(db, 'legacyUsers')),
-    await getDocs(appCollection(db, 'users'))
-  ];
+  let sources = [];
+  try {
+    sources = [
+      await getDocs(appCollection(db, 'userInvites')),
+      await getDocs(appCollection(db, 'legacyUsers')),
+      await getDocs(appCollection(db, 'users'))
+    ];
+  } catch (error) {
+    if (error?.code === 'permission-denied') return profile;
+    throw error;
+  }
 
   const accountKeys = [
     normalizeText(account.username).toLowerCase(),

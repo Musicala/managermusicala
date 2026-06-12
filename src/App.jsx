@@ -78,7 +78,11 @@ export default function App() {
     if (!savedId) return undefined;
     return listenAssistantAccounts(accounts => {
       const account = accounts.find(item => item.id === savedId && item.active !== false);
-      if (account) resolveAssistantProfile(account, authUser).then(setProfile);
+      if (account) {
+        resolveAssistantProfile(account, authUser, { skipRestrictedLookups: true })
+          .then(setProfile)
+          .catch(error => setProfileError(error.message || 'No se pudo cargar el usuario asistente.'));
+      }
     });
   }, [authUser]);
 

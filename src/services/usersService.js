@@ -143,12 +143,11 @@ export async function updateUserProfile(userId, changes) {
   }
 
   if (changes.source === 'assistantAccount') {
-    await setDoc(appDoc(db, 'legacyUsers', `assistant-${userId}`), {
+    await setDoc(appDoc(db, 'assistantAccounts', userId), {
       ...payload,
       displayName: normalizeText(changes.displayName),
-      legacyUsername: normalizeText(changes.username || changes.displayName).toLowerCase(),
-      role: 'asistente',
-      email: 'musicalaasesor@gmail.com'
+      username: normalizeText(changes.username || changes.displayName).toLowerCase(),
+      role: 'asistente'
     }, { merge: true });
     return;
   }
@@ -171,7 +170,7 @@ export async function deleteUserProfile(user) {
   }
 
   if (user.source === 'assistantAccount') {
-    await deleteDoc(appDoc(db, 'legacyUsers', `assistant-${user.id}`));
+    await deleteDoc(appDoc(db, 'assistantAccounts', user.id));
     return;
   }
 

@@ -26,9 +26,13 @@ export default function AssistantIdentityScreen({ authUser, onSelect }) {
       setError('Contraseña incorrecta.');
       return;
     }
-    const profile = await resolveAssistantProfile(selected, authUser);
-    window.sessionStorage.setItem('managerAssistantAccountId', selected.id);
-    onSelect(profile);
+    try {
+      const profile = await resolveAssistantProfile(selected, authUser, { skipRestrictedLookups: true });
+      window.sessionStorage.setItem('managerAssistantAccountId', selected.id);
+      onSelect(profile);
+    } catch (error) {
+      setError(error.message || 'No se pudo entrar como asistente.');
+    }
   }
 
   return (
