@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CalendarDays, Download, Eye, Grid3X3, LogOut, Search, Settings, Users, X } from 'lucide-react';
+import { AlertTriangle, CalendarDays, Download, Eye, FileCheck2, Grid3X3, LogOut, Search, Settings, Users, X } from 'lucide-react';
 import { firebaseReady } from './firebase/firebase';
 import { ensureCurrentUserProfile, listenAuth, logout } from './services/authService';
 import { SHARED_ASSISTANT_EMAIL } from './services/authService';
@@ -7,6 +7,7 @@ import { resolveAssistantProfile, listenAssistantAccounts } from './services/ass
 import { listenButtons } from './services/buttonsService';
 import { listenSchedule } from './services/scheduleService';
 import { listenUsers } from './services/usersService';
+import { listenCertificates } from './services/certificatesService';
 import { DEFAULT_MANAGER_SETTINGS, listenManagerSettings } from './services/managerConfigService';
 import { ROLES, getInitials, normalizeKey, normalizeText } from './utils/normalize';
 import { assetUrl } from './utils/assets';
@@ -19,11 +20,13 @@ import AdminSchedule from './components/AdminSchedule';
 import UsersAdmin from './components/UsersAdmin';
 import DataManager from './components/DataManager';
 import ManagerSettings from './components/ManagerSettings';
+import CertificatesManager from './components/CertificatesManager';
 
 const NAV_ITEMS = [
   { id: 'tools', label: 'Herramientas', icon: Grid3X3, roles: ['*'] },
   { id: 'my-schedule', label: 'Mi horario', icon: CalendarDays, roles: ['asistente'] },
   { id: 'admin-schedule', label: 'Gestionar horario', icon: CalendarDays, roles: ['admin'] },
+  { id: 'certificates', label: 'Certificados', icon: FileCheck2, roles: ['admin', 'asistente'] },
   { id: 'data', label: 'Botones', icon: Download, roles: ['admin'] },
   { id: 'users', label: 'Usuarios', icon: Users, roles: ['admin'] },
   { id: 'settings', label: 'Configuracion', icon: Settings, roles: ['admin'] }
@@ -38,6 +41,7 @@ export default function App() {
   const [buttons, setButtons] = useState([]);
   const [schedule, setSchedule] = useState([]);
   const [users, setUsers] = useState([]);
+  const [certificates, setCertificates] = useState([]);
   const [activeView, setActiveView] = useState('tools');
   const [search, setSearch] = useState('');
   const [managerSettings, setManagerSettings] = useState(DEFAULT_MANAGER_SETTINGS);
@@ -94,11 +98,13 @@ export default function App() {
     const unsubButtons = listenButtons(setButtons);
     const unsubSchedule = listenSchedule(setSchedule);
     const unsubUsers = isAdmin ? listenUsers(setUsers) : () => {};
+    const unsubCertificates = listenCertificates(setCertificates);
     const unsubSettings = listenManagerSettings(setManagerSettings);
     return () => {
       unsubButtons();
       unsubSchedule();
       unsubUsers();
+      unsubCertificates();
       unsubSettings();
     };
   }, [isActive, isAdmin]);
@@ -163,6 +169,10 @@ export default function App() {
     const activeScenario = normalizeText(managerSettings.activeScenario || 'normal').toLowerCase();
     return schedule.filter(item => normalizeText(item.scenario || 'normal').toLowerCase() === activeScenario);
   }, [schedule, managerSettings.activeScenario]);
+  const canManageCertificates = effectiveProfile?.role === ROLES.ADMIN || effectiveProfile?.role === ROLES.ASISTENTE;
+  const pendingCertificatesCount = useMemo(() => {
+    return certificates.filter(item => (item.status || 'pendiente') === 'pendiente').length;
+  }, [certificates]);
 
   if (!firebaseReady) return <ConfigMissing />;
   if (authLoading) return <LoadingScreen text="Cargando Musicala Manager..." />;
@@ -242,6 +252,9 @@ export default function App() {
                 >
                   <Icon size={18} />
                   <span>{item.label}</span>
+                  {item.id === 'certificates' && pendingCertificatesCount > 0 && (
+                    <span className="nav-badge">{pendingCertificatesCount}</span>
+                  )}
                 </button>
               );
             })}
@@ -279,6 +292,9 @@ export default function App() {
           {activeView === 'tools' && <ButtonGrid buttons={visibleButtons} search={search} />}
           {activeView === 'my-schedule' && <AssistantSchedule schedule={scenarioSchedule} user={effectiveProfile} settings={managerSettings} />}
           {activeView === 'admin-schedule' && effectiveIsAdmin && <AdminSchedule schedule={scenarioSchedule} users={users} settings={managerSettings} />}
+          {activeView === 'certificates' && canManageCertificates && (
+            <CertificatesManager certificates={certificates} currentUserName={currentUserName} canManage={canManageCertificates} />
+          )}
           {activeView === 'data' && effectiveIsAdmin && <DataManager buttons={buttons} />}
           {activeView === 'users' && effectiveIsAdmin && <UsersAdmin users={users} buttons={buttons} />}
           {activeView === 'settings' && effectiveIsAdmin && <ManagerSettings />}
@@ -293,6 +309,7 @@ function getViewTitle(view) {
     tools: 'Herramientas',
     'my-schedule': 'Mi horario',
     'admin-schedule': 'Gestion de horario',
+    certificates: 'Certificados',
     data: 'Gestion de botones',
     users: 'Usuarios y accesos',
     settings: 'Configuracion'

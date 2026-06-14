@@ -89,6 +89,18 @@ service cloud.firestore {
       );
     }
 
+    function isManagerCertificateManager() {
+      return signedIn() && (
+        isManagerBootstrapAdmin() ||
+        isManagerSharedAssistantEmail() ||
+        (
+          managerHasUserDoc()
+          && managerUserDoc().active == true
+          && managerUserDoc().role in ['admin', 'asistente']
+        )
+      );
+    }
+
     function managerValidSelfCreate(userId) {
       return signedIn()
         && userId == request.auth.uid
@@ -179,6 +191,11 @@ service cloud.firestore {
       match /taskTemplates/{templateId} {
         allow read: if isManagerActiveAdmin();
         allow write, delete: if isManagerActiveAdmin();
+      }
+
+      match /certificates/{certificateId} {
+        allow read: if isManagerActiveUser();
+        allow create, update, delete: if isManagerCertificateManager();
       }
 
       match /assistantAccounts/{accountId} {
