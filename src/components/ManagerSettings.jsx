@@ -40,6 +40,12 @@ const MESSAGE_TYPE_LABELS = {
   dayEnd: 'Final de jornada'
 };
 
+const SOUND_PROFILE_LABELS = {
+  soft: 'Suave',
+  clear: 'Claro',
+  assertive: 'Insistente'
+};
+
 export default function ManagerSettings() {
   const [settings, setSettings] = useState(DEFAULT_MANAGER_SETTINGS);
   const [templates, setTemplates] = useState([]);
@@ -206,6 +212,26 @@ export default function ManagerSettings() {
             <input type="checkbox" checked={settings.soundEnabled} onChange={e => setField('soundEnabled', e.target.checked)} />
             <span><Volume2 size={15} /> Usar sonido</span>
           </label>
+          <div className="form-grid two">
+            <label>
+              <span>Tipo de sonido</span>
+              <select value={settings.soundProfile || 'clear'} onChange={e => setField('soundProfile', e.target.value)}>
+                {Object.entries(SOUND_PROFILE_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Repetir si no se cierra (segundos)</span>
+              <input
+                type="number"
+                min="0"
+                step="5"
+                value={settings.notificationRepeatSeconds ?? 25}
+                onChange={e => setField('notificationRepeatSeconds', Number(e.target.value))}
+              />
+            </label>
+          </div>
           <div className="form-grid two">
             <label>
               <span>Antes de iniciar tarea</span>

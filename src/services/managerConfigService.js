@@ -5,6 +5,8 @@ import { appCollection, appDoc } from '../firebase/dbPaths';
 export const DEFAULT_MANAGER_SETTINGS = {
   notificationsEnabled: true,
   soundEnabled: true,
+  soundProfile: 'clear',
+  notificationRepeatSeconds: 25,
   taskStartMinutesBefore: 5,
   taskChangeMinutesBefore: 3,
   breakIntervalMinutes: 135,

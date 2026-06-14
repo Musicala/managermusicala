@@ -270,7 +270,11 @@ function deliverNotification({ key, message, type, target, settings, user, addIn
       icon: assetUrl('logo.png')
     });
   }
-  if ((settings.soundEnabled || forceSound) && user?.role !== 'admin') playSoftPing();
+  const canPlaySound = (settings.soundEnabled || forceSound) && user?.role !== 'admin';
+  if (canPlaySound) {
+    playNotificationSound(settings.soundProfile, type);
+    scheduleFollowUpSound({ notification, message, settings, user, forceSound });
+  }
 }
 
 function NotificationStack({ notifications, onDismiss }) {
@@ -325,20 +329,63 @@ function formatNotificationTime(value) {
   return date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
 }
 
-function playSoftPing() {
+function scheduleFollowUpSound({ notification, message, settings, user, forceSound }) {
+  const repeatSeconds = Number(settings.notificationRepeatSeconds ?? 25);
+  if (forceSound || !repeatSeconds || repeatSeconds < 1) return;
+  window.setTimeout(() => {
+    const stillVisible = readStoredNotifications(user).some(item => item.id === notification.id);
+    if (!stillVisible) return;
+    playNotificationSound(settings.soundProfile, 'followUp');
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      new Notification(message.title, {
+        body: message.body,
+        icon: assetUrl('logo.png')
+      });
+    }
+  }, repeatSeconds * 1000);
+}
+
+function playNotificationSound(profile = 'clear', type = 'taskStart') {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
     const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.frequency.value = 740;
-    gain.gain.value = 0.04;
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.18);
+    const patterns = {
+      soft: [
+        { at: 0, freq: 720, duration: 0.16, volume: 0.045 },
+        { at: 0.26, freq: 920, duration: 0.18, volume: 0.04 }
+      ],
+      clear: [
+        { at: 0, freq: 784, duration: 0.18, volume: 0.07 },
+        { at: 0.32, freq: 988, duration: 0.2, volume: 0.075 },
+        { at: 0.68, freq: 1175, duration: 0.24, volume: 0.08 }
+      ],
+      assertive: [
+        { at: 0, freq: 660, duration: 0.2, volume: 0.085 },
+        { at: 0.28, freq: 880, duration: 0.22, volume: 0.09 },
+        { at: 0.58, freq: 1046, duration: 0.24, volume: 0.095 },
+        { at: 0.94, freq: 1320, duration: 0.28, volume: 0.1 }
+      ]
+    };
+    const selectedProfile = type === 'taskChange' && profile === 'soft' ? 'clear' : profile;
+    const notes = patterns[selectedProfile] || patterns.clear;
+    notes.forEach(note => playTone(ctx, note));
+    window.setTimeout(() => ctx.close?.(), 1800);
   } catch {
     // El sonido es opcional.
   }
+}
+
+function playTone(ctx, note) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(note.freq, ctx.currentTime + note.at);
+  gain.gain.setValueAtTime(0.0001, ctx.currentTime + note.at);
+  gain.gain.exponentialRampToValueAtTime(note.volume, ctx.currentTime + note.at + 0.025);
+  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + note.at + note.duration);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(ctx.currentTime + note.at);
+  osc.stop(ctx.currentTime + note.at + note.duration + 0.04);
 }
