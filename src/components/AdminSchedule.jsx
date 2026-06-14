@@ -247,6 +247,7 @@ export default function AdminSchedule({ schedule, users, settings }) {
 
     const placements = [];
     let repeatIndex = 0;
+    let adjustedCount = 0;
 
     for (const assistant of assistants) {
       const info = hubInfoByAssistant[normalizeKey(assistant.email || assistant.name)];
@@ -272,10 +273,37 @@ export default function AdminSchedule({ schedule, users, settings }) {
               }
             }
           }
+
+          // Si ninguna tarea cabe completa pero todavía queda tiempo útil,
+          // toma una tarea más larga (p. ej. de 1 hora) y la recorta al tiempo
+          // restante (mínimo 30 min) solo para ese hueco.
+          let placedDuration = chosen ? Number(chosen.durationMinutes || 30) : null;
+          if (!chosen && remaining >= 30) {
+            const pendingLargerIdx = pendingQueue.findIndex(template =>
+              Number(template.durationMinutes || 30) > remaining &&
+              (!template.suggestedOwner || normalizeKey(template.suggestedOwner) === normalizeKey(assistant.name))
+            );
+            if (pendingLargerIdx !== -1) {
+              chosen = pendingQueue.splice(pendingLargerIdx, 1)[0];
+            } else if (repeatables.length) {
+              for (let n = 0; n < repeatables.length; n += 1) {
+                const candidate = repeatables[(repeatIndex + n) % repeatables.length];
+                if (Number(candidate.durationMinutes || 30) > remaining) {
+                  chosen = candidate;
+                  repeatIndex = (repeatIndex + n + 1) % repeatables.length;
+                  break;
+                }
+              }
+            }
+            if (chosen) {
+              placedDuration = remaining;
+              adjustedCount += 1;
+            }
+          }
+
           if (!chosen) break;
-          const duration = Number(chosen.durationMinutes || 30);
-          placements.push({ assistant, startMinutes: cursor, endMinutes: cursor + duration, template: chosen });
-          cursor += duration;
+          placements.push({ assistant, startMinutes: cursor, endMinutes: cursor + placedDuration, template: chosen });
+          cursor += placedDuration;
         }
       }
     }
@@ -305,7 +333,10 @@ export default function AdminSchedule({ schedule, users, settings }) {
           scenario: settings?.activeScenario || 'normal'
         });
       }
-      setNotice(`Se asignaron ${placements.length} tarea(s) automáticamente en los huecos del ${day}.`);
+      const adjustedNote = adjustedCount
+        ? ` Había tareas de mayor duración (p. ej. de 1 hora), así que ${adjustedCount} se ajustaron al tiempo restante (p. ej. 30 min) para completar el horario.`
+        : '';
+      setNotice(`Se asignaron ${placements.length} tarea(s) automáticamente en los huecos del ${day}.${adjustedNote}`);
     } catch (err) {
       setError(err.message || 'No se pudo rellenar el horario.');
     } finally {
