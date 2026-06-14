@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock } from 'lucide-react';
 import { DAYS, scheduleItemMatchesAssistant } from '../utils/normalize';
-import { blockStyle, TIMELINE_END, TIMELINE_START, SLOT_HEIGHT, sortSchedule, timeToMinutes } from '../utils/time';
+import { blockStyle, getTodayName, minutesToTime, nowMinutes, TIMELINE_END, TIMELINE_START, SLOT_HEIGHT, sortSchedule, timeToMinutes } from '../utils/time';
 import { calculateBreaks } from '../utils/breaks';
 
 export default function AssistantSchedule({ schedule, user, settings }) {
@@ -27,7 +27,7 @@ export default function AssistantSchedule({ schedule, user, settings }) {
       </div>
 
       <DayTabs active={day} onChange={setDay} />
-      <Timeline items={items} emptyTitle="No tienes tareas este día" />
+      <Timeline day={day} items={items} emptyTitle="No tienes tareas este día" />
     </section>
   );
 }
@@ -44,7 +44,7 @@ export function DayTabs({ active, onChange }) {
   );
 }
 
-export function Timeline({ items, emptyTitle = 'Sin tareas' }) {
+export function Timeline({ day, items, emptyTitle = 'Sin tareas' }) {
   const hours = [];
   for (let h = TIMELINE_START; h <= TIMELINE_END; h += 1) hours.push(h);
 
@@ -56,6 +56,7 @@ export function Timeline({ items, emptyTitle = 'Sin tareas' }) {
 
       <div className="timeline-column" style={{ height: `${(TIMELINE_END - TIMELINE_START + 1) * SLOT_HEIGHT * 2}px` }}>
         {hours.map(hour => <div key={hour} className="hour-line" style={{ top: `${(hour - TIMELINE_START) * SLOT_HEIGHT * 2}px` }} />)}
+        <CurrentTimeLine day={day} items={items} />
         {items.map(item => <TimelineCard key={item.id} item={item} />)}
         {!items.length && (
           <div className="timeline-empty">
@@ -65,6 +66,37 @@ export function Timeline({ items, emptyTitle = 'Sin tareas' }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+export function CurrentTimeLine({ day, items = [] }) {
+  const [tick, setTick] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setTick(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const date = new Date(tick);
+  const currentMinute = nowMinutes(date);
+  const visibleStart = TIMELINE_START * 60;
+  const visibleEnd = (TIMELINE_END + 1) * 60;
+  if (day !== getTodayName(date) || currentMinute < visibleStart || currentMinute > visibleEnd) return null;
+
+  const activeItem = items.find(item => {
+    const start = timeToMinutes(item.startTime);
+    const end = timeToMinutes(item.endTime || item.startTime);
+    return Number.isFinite(start) && Number.isFinite(end) && start <= currentMinute && end > currentMinute;
+  });
+  const top = ((currentMinute - visibleStart) / 30) * SLOT_HEIGHT;
+  const label = activeItem?.task
+    ? `Ahora ${minutesToTime(currentMinute)} · ${activeItem.task}`
+    : `Ahora ${minutesToTime(currentMinute)}`;
+
+  return (
+    <div className="current-time-line" style={{ top: `${top}px` }} aria-label={label}>
+      <span>{label}</span>
     </div>
   );
 }

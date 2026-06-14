@@ -133,6 +133,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--vivaldi); backgr
 .time-axis span { height: calc(var(--slot, 42px) * 2); color: var(--muted); font-weight: 700; font-size: .72rem; }
 .timeline-column { position: relative; min-width: 260px; border: 1.5px solid var(--line); border-radius: 18px; background-color: #fff; background-image: repeating-linear-gradient(to bottom, transparent, transparent 39px, rgba(148,163,184,.28) 39px, rgba(148,163,184,.28) 40px); overflow: hidden; }
 .hour-line { position: absolute; left: 0; right: 0; height: 1px; background: transparent; }
+.current-time-line { position: absolute; left: 0; right: 0; height: 0; border-top: 2px solid var(--danger); z-index: 8; pointer-events: none; filter: drop-shadow(0 1px 2px rgba(220,38,38,.25)); }
+.current-time-line::before { content: ""; position: absolute; left: 8px; top: -5px; width: 10px; height: 10px; border-radius: 999px; background: var(--danger); box-shadow: 0 0 0 3px rgba(220,38,38,.14); }
+.current-time-line span { position: absolute; left: 22px; top: -13px; max-width: calc(100% - 34px); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; border-radius: 999px; padding: 3px 9px; background: var(--danger); color: #fff; font-size: 11px; font-weight: 900; line-height: 1.2; box-shadow: 0 8px 20px rgba(220,38,38,.2); }
 .timeline-card { position: absolute; left: 12px; right: 12px; border: 1px solid rgba(87,41,255,.14); border-left: 4px solid var(--vivaldi); border-radius: 14px; padding: 10px 12px; background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(243,239,255,.96)); color: var(--text); text-align: left; overflow: hidden; box-shadow: 0 8px 22px rgba(76,29,149,.08); }
 .timeline-card strong, .timeline-card span, .timeline-card small, .timeline-card em { display: block; }
 .timeline-card span, .timeline-card small, .timeline-card em { font-size: .76rem; opacity: .82; }

@@ -5,7 +5,7 @@ import { DEFAULT_MANAGER_SETTINGS, listenTaskTemplates, saveManagerSettings } fr
 import { connectHub, hubScheduleForDay, listenHubSchedules, listenHubUser, matchHubMember } from '../services/hubService';
 import { DAYS, normalizeKey, scheduleItemMatchesAssistant } from '../utils/normalize';
 import { TIMELINE_END, TIMELINE_START, SLOT_HEIGHT, durationLabel, minutesToTime, sortSchedule, timeToMinutes } from '../utils/time';
-import { DayTabs, TimelineCard } from './AssistantSchedule';
+import { CurrentTimeLine, DayTabs, TimelineCard } from './AssistantSchedule';
 import TaskModal from './TaskModal';
 
 export default function AdminSchedule({ schedule, users, settings }) {
@@ -670,6 +670,7 @@ export default function AdminSchedule({ schedule, users, settings }) {
             return (
               <div className="timeline-column admin-col" key={keys[0]} style={{ height: `${(TIMELINE_END - TIMELINE_START + 1) * SLOT_HEIGHT * 2}px` }}>
                 {hours.map(hour => <div key={hour} className="hour-line" style={{ top: `${(hour - TIMELINE_START) * SLOT_HEIGHT * 2}px` }} />)}
+                <CurrentTimeLine day={day} items={items} />
                 <button className="quick-add" onClick={() => setEditing({ day, assistantName: assistant.name, assistantEmail: assistant.email, scenario: settings?.activeScenario || 'normal' })}>+ agregar</button>
                 {items.map(item => <TimelineCard key={item.id} item={item} onClick={() => setEditing(item)} />)}
               </div>
