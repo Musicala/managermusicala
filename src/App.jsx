@@ -295,7 +295,7 @@ export default function App() {
           {activeView === 'certificates' && canManageCertificates && (
             <CertificatesManager certificates={certificates} currentUserName={currentUserName} canManage={canManageCertificates} />
           )}
-          {activeView === 'data' && effectiveIsAdmin && <DataManager buttons={buttons} />}
+          {activeView === 'data' && effectiveIsAdmin && <DataManager buttons={buttons} settings={managerSettings} />}
           {activeView === 'users' && effectiveIsAdmin && <UsersAdmin users={users} buttons={buttons} />}
           {activeView === 'settings' && effectiveIsAdmin && <ManagerSettings />}
         </div>

@@ -1,6 +1,7 @@
 import { deleteDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { appCollection, appDoc } from '../firebase/dbPaths';
+import { BUTTON_SECTION_OPTIONS, normalizeButtonSections } from '../utils/normalize';
 
 export const DEFAULT_MANAGER_SETTINGS = {
   notificationsEnabled: true,
@@ -17,6 +18,7 @@ export const DEFAULT_MANAGER_SETTINGS = {
     { id: 'redistribuido', name: 'Horario redistribuido' },
     { id: 'vacacional', name: 'Horario vacacional' }
   ],
+  buttonSections: BUTTON_SECTION_OPTIONS,
   notificationMessages: [
     {
       id: 'task-start',
@@ -78,6 +80,7 @@ export function listenManagerSettings(callback) {
     callback({
       ...DEFAULT_MANAGER_SETTINGS,
       ...data,
+      buttonSections: normalizeButtonSections(data.buttonSections),
       notificationMessages: mergeDefaultNotificationMessages(data.notificationMessages)
     });
   });
@@ -87,6 +90,7 @@ export async function saveManagerSettings(settings) {
   if (!db) throw new Error('Firebase no esta disponible.');
   await setDoc(appDoc(db, 'managerSettings', 'general'), {
     ...settings,
+    buttonSections: normalizeButtonSections(settings.buttonSections),
     updatedAt: serverTimestamp()
   }, { merge: true });
 }

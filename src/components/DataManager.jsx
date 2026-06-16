@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Plus, Save, Trash2 } from 'lucide-react';
 import { deleteButton, saveButton } from '../services/buttonsService';
-import { BUTTON_SECTION_OPTIONS, normalizeButtonSection } from '../utils/normalize';
+import { normalizeButtonSection, normalizeButtonSections } from '../utils/normalize';
 
 const EMPTY_BUTTON = {
   name: '',
@@ -15,12 +15,13 @@ const EMPTY_BUTTON = {
 
 const ICON_OPTIONS = ['🎵', '📅', '✅', '📝', '📁', '📊', '🎓', '💬', '📌', '💰', '🧾', '🕒', '👥', '⭐', '🔗'];
 
-export default function DataManager({ buttons }) {
+export default function DataManager({ buttons, settings = {} }) {
   const [drafts, setDrafts] = useState({});
   const [creating, setCreating] = useState(false);
   const [newButton, setNewButton] = useState(EMPTY_BUTTON);
   const [message, setMessage] = useState('');
   const [savingId, setSavingId] = useState('');
+  const sectionOptions = normalizeButtonSections(settings.buttonSections);
 
   function getDraft(button) {
     return drafts[button.id] || { ...button };
@@ -41,7 +42,7 @@ export default function DataManager({ buttons }) {
     setSavingId(button.id);
     setMessage('');
     try {
-      await saveButton({ ...draft, id: button.id });
+      await saveButton({ ...draft, id: button.id, sectionOptions });
       setMessage('Botón guardado. El caos retrocede un centímetro.');
     } catch (error) {
       setMessage(error.message || 'No se pudo guardar el botón.');
@@ -55,7 +56,7 @@ export default function DataManager({ buttons }) {
     setSavingId('new');
     setMessage('');
     try {
-      await saveButton(newButton);
+      await saveButton({ ...newButton, sectionOptions });
       setNewButton(EMPTY_BUTTON);
       setCreating(false);
       setMessage('Botón creado.');
@@ -86,7 +87,7 @@ export default function DataManager({ buttons }) {
 
       {creating && (
         <form className="button-editor new" onSubmit={saveNew}>
-          <ButtonFields value={newButton} onChange={(field, value) => setNewButton(current => ({ ...current, [field]: value }))} />
+          <ButtonFields value={newButton} sectionOptions={sectionOptions} onChange={(field, value) => setNewButton(current => ({ ...current, [field]: value }))} />
           <div className="right-actions">
             <button className="btn ghost" type="button" onClick={() => setCreating(false)}>Cancelar</button>
             <button className="btn primary" disabled={savingId === 'new'}>Guardar</button>
@@ -99,7 +100,7 @@ export default function DataManager({ buttons }) {
           const draft = getDraft(button);
           return (
             <article className="button-editor" key={button.id}>
-              <ButtonFields value={draft} onChange={(field, value) => setDraft(button.id, field, value)} />
+              <ButtonFields value={draft} sectionOptions={sectionOptions} onChange={(field, value) => setDraft(button.id, field, value)} />
               <div className="right-actions">
                 <button className="btn danger" onClick={() => remove(button)}><Trash2 size={17} /> Eliminar</button>
                 <button className="btn primary" onClick={() => saveExisting(button)} disabled={savingId === button.id}>
@@ -114,7 +115,7 @@ export default function DataManager({ buttons }) {
   );
 }
 
-function ButtonFields({ value, onChange }) {
+function ButtonFields({ value, sectionOptions, onChange }) {
   const [pickerOpen, setPickerOpen] = useState(false);
 
   return (
@@ -138,10 +139,10 @@ function ButtonFields({ value, onChange }) {
         <label>
           <span>Sección</span>
           <select
-            value={normalizeButtonSection(value.section)}
+            value={normalizeButtonSection(value.section, sectionOptions)}
             onChange={e => onChange('section', e.target.value)}
           >
-            {BUTTON_SECTION_OPTIONS.map(section => (
+            {sectionOptions.map(section => (
               <option key={section} value={section}>{section}</option>
             ))}
           </select>

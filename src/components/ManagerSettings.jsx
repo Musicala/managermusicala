@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Bell, Plus, Save, Trash2, UserPlus, Volume2 } from 'lucide-react';
 import { deleteAssistantAccount, listenAssistantAccounts, saveAssistantAccount } from '../services/assistantAccountsService';
+import { BUTTON_SECTION_OPTIONS, normalizeButtonSections } from '../utils/normalize';
 import {
   DEFAULT_MANAGER_SETTINGS,
   listenManagerSettings,
@@ -100,6 +101,33 @@ export default function ManagerSettings() {
       notificationMessages: mergeDefaultNotificationMessages(current.notificationMessages)
         .filter((_, itemIndex) => itemIndex !== index)
     }));
+  }
+
+  function updateButtonSection(index, value) {
+    setSettings(current => {
+      const sections = normalizeButtonSections(current.buttonSections);
+      sections[index] = value;
+      return { ...current, buttonSections: sections };
+    });
+  }
+
+  function addButtonSection() {
+    setSettings(current => ({
+      ...current,
+      buttonSections: [...normalizeButtonSections(current.buttonSections), 'Nueva sección']
+    }));
+  }
+
+  function removeButtonSection(index) {
+    setSettings(current => {
+      const sections = normalizeButtonSections(current.buttonSections)
+        .filter((_, itemIndex) => itemIndex !== index);
+      return { ...current, buttonSections: normalizeButtonSections(sections) };
+    });
+  }
+
+  function resetButtonSections() {
+    setSettings(current => ({ ...current, buttonSections: BUTTON_SECTION_OPTIONS }));
   }
 
   async function saveSettings() {
@@ -296,6 +324,52 @@ export default function ManagerSettings() {
           <div className="right-actions">
             <button className="btn primary" onClick={saveSettings} disabled={saving}>
               <Save size={17} /> {saving ? 'Guardando...' : 'Guardar configuracion'}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="module-card wide">
+        <div className="module-header">
+          <div>
+            <p className="eyebrow">Herramientas</p>
+            <h2>Secciones de botones</h2>
+          </div>
+          <button className="btn ghost" type="button" onClick={addButtonSection}>
+            <Plus size={16} /> Agregar sección
+          </button>
+        </div>
+        <div className="settings-body">
+          <div className="notification-message-list">
+            {normalizeButtonSections(settings.buttonSections).map((section, index) => (
+              <div className="notification-message-row button-section-row" key={`${section}-${index}`}>
+                <label>
+                  <span>Nombre de sección</span>
+                  <input
+                    value={section}
+                    onChange={e => updateButtonSection(index, e.target.value)}
+                    placeholder="Académico"
+                  />
+                </label>
+                <div className="right-actions">
+                  <button
+                    className="btn danger"
+                    type="button"
+                    onClick={() => removeButtonSection(index)}
+                    disabled={normalizeButtonSections(settings.buttonSections).length <= 1}
+                  >
+                    <Trash2 size={16} /> Eliminar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="right-actions">
+            <button className="btn ghost" type="button" onClick={resetButtonSections}>
+              Restaurar lista base
+            </button>
+            <button className="btn primary" onClick={saveSettings} disabled={saving}>
+              <Save size={17} /> {saving ? 'Guardando...' : 'Guardar secciones'}
             </button>
           </div>
         </div>

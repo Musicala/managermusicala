@@ -89,9 +89,10 @@ export function normalizeRole(value) {
   return key || ROLES.DOCENTE;
 }
 
-export function normalizeButtonSection(value) {
+export function normalizeButtonSection(value, options = BUTTON_SECTION_OPTIONS) {
   const key = normalizeKey(value);
   if (!key) return 'Otros';
+  const sectionOptions = Array.isArray(options) && options.length ? options : BUTTON_SECTION_OPTIONS;
 
   const aliases = {
     academico: 'Académico',
@@ -118,7 +119,22 @@ export function normalizeButtonSection(value) {
   };
 
   if (aliases[key]) return aliases[key];
-  return BUTTON_SECTION_OPTIONS.find(section => normalizeKey(section) === key) || 'Otros';
+  return sectionOptions.find(section => normalizeKey(section) === key)
+    || BUTTON_SECTION_OPTIONS.find(section => normalizeKey(section) === key)
+    || 'Otros';
+}
+
+export function normalizeButtonSections(value) {
+  const source = Array.isArray(value) ? value : BUTTON_SECTION_OPTIONS;
+  const sections = source
+    .map(normalizeText)
+    .filter(Boolean);
+  const unique = [];
+  sections.forEach(section => {
+    if (!unique.some(item => normalizeKey(item) === normalizeKey(section))) unique.push(section);
+  });
+  if (!unique.some(section => normalizeKey(section) === 'otros')) unique.push('Otros');
+  return unique.length ? unique : BUTTON_SECTION_OPTIONS;
 }
 
 export function normalizeDay(value) {
