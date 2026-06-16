@@ -12,6 +12,17 @@ export const ROLE_LABELS = {
   docente: 'Docente'
 };
 
+export const BUTTON_SECTION_OPTIONS = [
+  'Académico',
+  'Operación',
+  'Admin',
+  'Comercial',
+  'Finanzas',
+  'Comunicación',
+  'Recursos',
+  'Otros'
+];
+
 export function normalizeText(value) {
   return String(value ?? '')
     .replace(/\u00A0/g, ' ')
@@ -76,6 +87,38 @@ export function normalizeRole(value) {
   if (key.includes('asistente')) return ROLES.ASISTENTE;
   if (key.includes('docente')) return ROLES.DOCENTE;
   return key || ROLES.DOCENTE;
+}
+
+export function normalizeButtonSection(value) {
+  const key = normalizeKey(value);
+  if (!key) return 'Otros';
+
+  const aliases = {
+    academico: 'Académico',
+    academia: 'Académico',
+    clases: 'Académico',
+    operacion: 'Operación',
+    operativo: 'Operación',
+    operaciones: 'Operación',
+    admin: 'Admin',
+    administrativo: 'Admin',
+    administracion: 'Admin',
+    comercial: 'Comercial',
+    ventas: 'Comercial',
+    finanzas: 'Finanzas',
+    pagos: 'Finanzas',
+    contabilidad: 'Finanzas',
+    comunicacion: 'Comunicación',
+    comunicaciones: 'Comunicación',
+    recursos: 'Recursos',
+    material: 'Recursos',
+    materiales: 'Recursos',
+    otros: 'Otros',
+    general: 'Otros'
+  };
+
+  if (aliases[key]) return aliases[key];
+  return BUTTON_SECTION_OPTIONS.find(section => normalizeKey(section) === key) || 'Otros';
 }
 
 export function normalizeDay(value) {

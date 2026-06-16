@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus, Save, Trash2 } from 'lucide-react';
 import { deleteButton, saveButton } from '../services/buttonsService';
+import { BUTTON_SECTION_OPTIONS, normalizeButtonSection } from '../utils/normalize';
 
 const EMPTY_BUTTON = {
   name: '',
@@ -136,7 +137,14 @@ function ButtonFields({ value, onChange }) {
         </label>
         <label>
           <span>Sección</span>
-          <input value={value.section || ''} onChange={e => onChange('section', e.target.value)} placeholder="Académico" />
+          <select
+            value={normalizeButtonSection(value.section)}
+            onChange={e => onChange('section', e.target.value)}
+          >
+            {BUTTON_SECTION_OPTIONS.map(section => (
+              <option key={section} value={section}>{section}</option>
+            ))}
+          </select>
         </label>
         <label>
           <span>Icono</span>

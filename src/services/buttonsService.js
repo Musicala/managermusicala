@@ -8,7 +8,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { appCollection, appDoc } from '../firebase/dbPaths';
-import { normalizeText, slugify } from '../utils/normalize';
+import { normalizeButtonSection, normalizeText, slugify } from '../utils/normalize';
 
 export function listenButtons(callback) {
   if (!db) return () => {};
@@ -32,7 +32,7 @@ export async function saveButton(button) {
     name: normalizeText(button.name),
     url: normalizeText(button.url),
     type: normalizeText(button.type || 'externo').toLowerCase(),
-    section: normalizeText(button.section || 'Otros'),
+    section: normalizeButtonSection(button.section),
     icon: normalizeText(button.icon || ''),
     order: Number(button.order || 999),
     active: button.active !== false,
@@ -49,7 +49,7 @@ export async function createButton(button) {
     name: normalizeText(button.name),
     url: normalizeText(button.url),
     type: normalizeText(button.type || 'externo').toLowerCase(),
-    section: normalizeText(button.section || 'Otros'),
+    section: normalizeButtonSection(button.section),
     icon: normalizeText(button.icon || ''),
     order: Number(button.order || 999),
     active: button.active !== false,

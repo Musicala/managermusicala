@@ -9,6 +9,7 @@ import { appCollection, appDoc } from '../firebase/dbPaths';
 import {
   emailKey,
   normalizeButtonAccess,
+  normalizeButtonSection,
   normalizeRole,
   normalizeText,
   parseBoolean,
@@ -46,7 +47,7 @@ export function normalizeImportedButton(row) {
     name,
     url: normalizeText(pick(row, ['url', 'link', 'enlace'])),
     type: normalizeText(pick(row, ['type', 'tipo'])) || 'externo',
-    section: normalizeText(pick(row, ['section', 'seccion', 'sección', 'categoria', 'categoría'])) || 'Otros',
+    section: normalizeButtonSection(pick(row, ['section', 'seccion', 'sección', 'categoria', 'categoría'])),
     icon: normalizeText(pick(row, ['icon', 'icono', 'ícono'])) || '',
     order: Number(pick(row, ['order', 'orden']) || 999),
     active: parseBoolean(pick(row, ['active', 'activo', 'estado']), true),
