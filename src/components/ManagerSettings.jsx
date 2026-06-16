@@ -460,6 +460,10 @@ export default function ManagerSettings() {
               <span>Duracion</span>
               <input type="number" min="5" step="5" value={template.durationMinutes} onChange={e => setTemplate(current => ({ ...current, durationMinutes: Number(e.target.value) }))} />
             </label>
+            <label>
+              <span>Asistente sugerida</span>
+              <input value={template.suggestedOwner} onChange={e => setTemplate(current => ({ ...current, suggestedOwner: e.target.value }))} placeholder="Camila Rodriguez o Liz Rincon" />
+            </label>
           </div>
           <label>
             <span>Descripcion</span>

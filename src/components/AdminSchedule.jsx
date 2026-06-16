@@ -88,24 +88,38 @@ export default function AdminSchedule({ schedule, users, settings }) {
   const hours = [];
   for (let h = TIMELINE_START; h <= TIMELINE_END; h += 1) hours.push(h);
 
+  function assistantKey(assistant) {
+    return normalizeKey(assistant?.email || assistant?.name || assistant?.username);
+  }
+
+  function templateAppliesToAssistant(template, assistant) {
+    return !template?.suggestedOwner || normalizeKey(template.suggestedOwner) === normalizeKey(assistant?.name);
+  }
+
   // Cobertura: qué tareas de la bolsa ya están asignadas en el día seleccionado (escenario activo).
   const coverage = useMemo(() => {
     const dayItems = schedule.filter(item => item.active !== false && item.day === day);
-    return taskTemplates.map(template => ({
-      template,
-      matches: dayItems
-        .filter(item => normalizeKey(item.task) === normalizeKey(template.name))
-        .sort(sortSchedule)
-    }));
-  }, [schedule, taskTemplates, day]);
+    return assistants.flatMap(assistant => taskTemplates
+      .filter(template => templateAppliesToAssistant(template, assistant))
+      .map(template => ({
+        assistant,
+        template,
+        matches: dayItems
+          .filter(item => normalizeKey(item.task) === normalizeKey(template.name))
+          .filter(item => scheduleItemMatchesAssistant(item, assistant))
+          .sort(sortSchedule)
+      })));
+  }, [schedule, taskTemplates, assistants, day]);
   const pendingTemplates = coverage.filter(entry => entry.matches.length === 0);
 
-  function assignFromTemplate(template) {
+  function assignFromTemplate(template, assistant = null) {
     const duration = Number(template.durationMinutes || 30);
     const startTime = '09:00';
     setEditing({
       day,
       scenario: settings?.activeScenario || 'normal',
+      assistantName: assistant?.name || '',
+      assistantEmail: assistant?.email || '',
       task: template.name || '',
       description: template.description || '',
       category: template.category || '',
@@ -237,12 +251,18 @@ export default function AdminSchedule({ schedule, users, settings }) {
     const assignedKeys = new Set(
       schedule
         .filter(item => item.active !== false && item.day === day)
-        .map(item => normalizeKey(item.task))
+        .map(item => `${normalizeKey(item.task)}::${normalizeKey(item.assistantEmail || item.assistantName || item.assistantUsername || item.username)}`)
     );
+    const isAssignedToAssistant = (template, assistant) => {
+      const taskKey = normalizeKey(template.name);
+      const keys = [
+        normalizeKey(assistant.email),
+        normalizeKey(assistant.name),
+        normalizeKey(assistant.username)
+      ].filter(Boolean);
+      return keys.some(key => assignedKeys.has(`${taskKey}::${key}`));
+    };
     const prioRank = { Alta: 0, Media: 1, Baja: 2 };
-    const pendingQueue = taskTemplates
-      .filter(template => !assignedKeys.has(normalizeKey(template.name)))
-      .sort((a, b) => (prioRank[a.priority] ?? 1) - (prioRank[b.priority] ?? 1));
     const repeatables = taskTemplates.filter(template => template.repeatable === true);
 
     const placements = [];
@@ -252,6 +272,11 @@ export default function AdminSchedule({ schedule, users, settings }) {
     for (const assistant of assistants) {
       const info = hubInfoByAssistant[normalizeKey(assistant.email || assistant.name)];
       if (!info?.jornada || !info.gaps.length) continue;
+      const pendingQueue = taskTemplates
+        .filter(template => templateAppliesToAssistant(template, assistant))
+        .filter(template => !isAssignedToAssistant(template, assistant))
+        .sort((a, b) => (prioRank[a.priority] ?? 1) - (prioRank[b.priority] ?? 1));
+      const assistantRepeatables = repeatables.filter(template => templateAppliesToAssistant(template, assistant));
       for (const [gapStart, gapEnd] of info.gaps) {
         let cursor = gapStart;
         while (gapEnd - cursor >= 15) {
@@ -263,12 +288,12 @@ export default function AdminSchedule({ schedule, users, settings }) {
           );
           if (pendingIdx !== -1) {
             chosen = pendingQueue.splice(pendingIdx, 1)[0];
-          } else if (repeatables.length) {
-            for (let n = 0; n < repeatables.length; n += 1) {
-              const candidate = repeatables[(repeatIndex + n) % repeatables.length];
+          } else if (assistantRepeatables.length) {
+            for (let n = 0; n < assistantRepeatables.length; n += 1) {
+              const candidate = assistantRepeatables[(repeatIndex + n) % assistantRepeatables.length];
               if (Number(candidate.durationMinutes || 30) <= remaining) {
                 chosen = candidate;
-                repeatIndex = (repeatIndex + n + 1) % repeatables.length;
+                repeatIndex = (repeatIndex + n + 1) % assistantRepeatables.length;
                 break;
               }
             }
@@ -285,12 +310,12 @@ export default function AdminSchedule({ schedule, users, settings }) {
             );
             if (pendingLargerIdx !== -1) {
               chosen = pendingQueue.splice(pendingLargerIdx, 1)[0];
-            } else if (repeatables.length) {
-              for (let n = 0; n < repeatables.length; n += 1) {
-                const candidate = repeatables[(repeatIndex + n) % repeatables.length];
+            } else if (assistantRepeatables.length) {
+              for (let n = 0; n < assistantRepeatables.length; n += 1) {
+                const candidate = assistantRepeatables[(repeatIndex + n) % assistantRepeatables.length];
                 if (Number(candidate.durationMinutes || 30) > remaining) {
                   chosen = candidate;
-                  repeatIndex = (repeatIndex + n + 1) % repeatables.length;
+                  repeatIndex = (repeatIndex + n + 1) % assistantRepeatables.length;
                   break;
                 }
               }
@@ -303,6 +328,7 @@ export default function AdminSchedule({ schedule, users, settings }) {
 
           if (!chosen) break;
           placements.push({ assistant, startMinutes: cursor, endMinutes: cursor + placedDuration, template: chosen });
+          assignedKeys.add(`${normalizeKey(chosen.name)}::${assistantKey(assistant)}`);
           cursor += placedDuration;
         }
       }
@@ -514,13 +540,14 @@ export default function AdminSchedule({ schedule, users, settings }) {
           <h3>Bolsa de tareas · cobertura del {day}</h3>
           {coverage.length === 0 && <p className="muted">No hay tareas base en la bolsa. Créalas en Configuración.</p>}
           <div className="coverage-list">
-            {coverage.map(({ template, matches }) => (
-              <div className={`coverage-item ${matches.length ? 'done' : 'pending'}`} key={template.id}>
+            {coverage.map(({ assistant, template, matches }) => (
+              <div className={`coverage-item ${matches.length ? 'done' : 'pending'}`} key={`${assistantKey(assistant)}-${template.id}`}>
                 <span className="coverage-status">
                   {matches.length ? <CheckCircle2 size={17} /> : <Circle size={17} />}
                 </span>
                 <span className="coverage-name">
                   <strong>{template.name}</strong>
+                  <span className="muted"> · {assistant.name || assistant.email}</span>
                   <span className="muted"> · {template.category || 'General'} · {durationLabel(template.durationMinutes || 30)}</span>
                 </span>
                 <span className="coverage-detail muted">
@@ -529,7 +556,7 @@ export default function AdminSchedule({ schedule, users, settings }) {
                     : 'Sin asignar'}
                 </span>
                 {!matches.length && (
-                  <button className="btn ghost small" onClick={() => assignFromTemplate(template)}>Asignar</button>
+                  <button className="btn ghost small" onClick={() => assignFromTemplate(template, assistant)}>Asignar</button>
                 )}
               </div>
             ))}
