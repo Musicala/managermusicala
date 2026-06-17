@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Briefcase, CheckCircle2, Circle, Clock, Link2, Plus, Wand2 } from 'lucide-react';
-import { saveScheduleTask, deleteScheduleTask, shiftScheduleTasks } from '../services/scheduleService';
+import { Briefcase, CheckCircle2, Circle, Clock, Copy, Link2, Plus, Wand2 } from 'lucide-react';
+import { saveScheduleTask, deleteScheduleTask, shiftScheduleTasks, duplicateScheduleDay } from '../services/scheduleService';
 import { DEFAULT_MANAGER_SETTINGS, listenTaskTemplates, saveManagerSettings } from '../services/managerConfigService';
 import { connectHub, hubScheduleForDay, listenHubSchedules, listenHubUser, matchHubMember } from '../services/hubService';
 import { DAYS, normalizeKey, scheduleItemMatchesAssistant } from '../utils/normalize';
@@ -17,6 +17,10 @@ export default function AdminSchedule({ schedule, users, settings }) {
   const [taskTemplates, setTaskTemplates] = useState([]);
   const [coverageOpen, setCoverageOpen] = useState(false);
   const [shiftOpen, setShiftOpen] = useState(false);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [duplicateDays, setDuplicateDays] = useState([]);
+  const [duplicateReplace, setDuplicateReplace] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
   const [shiftDays, setShiftDays] = useState([]);
   const [shiftAssistant, setShiftAssistant] = useState('');
   const [shiftPreset, setShiftPreset] = useState('-60');
@@ -376,10 +380,59 @@ export default function AdminSchedule({ schedule, users, settings }) {
       : [...current, name]);
   }
 
+  function toggleDuplicateDay(name) {
+    setDuplicateDays(current => current.includes(name)
+      ? current.filter(item => item !== name)
+      : [...current, name]);
+  }
+
   function openShiftPanel() {
     setShiftOpen(open => !open);
     setCoverageOpen(false);
+    setDuplicateOpen(false);
     setShiftDays(current => (current.length ? current : [day]));
+  }
+
+  function openDuplicatePanel() {
+    setDuplicateOpen(open => !open);
+    setCoverageOpen(false);
+    setShiftOpen(false);
+    setDuplicateDays(current => current.filter(name => name !== day));
+  }
+
+  async function handleDuplicateDay() {
+    const targets = duplicateDays.filter(name => name !== day);
+    if (!targets.length) {
+      setError('Selecciona al menos un día destino distinto al día actual.');
+      return;
+    }
+    const sourceItems = schedule
+      .filter(item => item.active !== false)
+      .filter(item => item.day === day);
+    if (!sourceItems.length) {
+      setError(`No hay tareas activas para duplicar del ${day}.`);
+      return;
+    }
+    const replaceText = duplicateReplace ? ' Se reemplazará el horario activo que ya exista en esos días.' : '';
+    const ok = window.confirm(`¿Duplicar ${sourceItems.length} tarea(s) del ${day} a ${targets.join(', ')}?${replaceText}`);
+    if (!ok) return;
+
+    setDuplicating(true);
+    setError('');
+    setNotice('');
+    try {
+      const count = await duplicateScheduleDay(sourceItems, targets, {
+        replaceExisting: duplicateReplace,
+        existingSchedule: schedule
+      });
+      setNotice(`Se duplicaron ${count} tarea(s) del ${day} a ${targets.join(', ')}.`);
+      setDuplicateOpen(false);
+      setDuplicateDays([]);
+    } catch (err) {
+      setError(err.message || 'No se pudo duplicar el horario.');
+    } finally {
+      setDuplicating(false);
+    }
   }
 
   async function handleShift() {
@@ -484,6 +537,9 @@ export default function AdminSchedule({ schedule, users, settings }) {
           <button className="btn ghost" onClick={openShiftPanel}>
             <Clock size={18} /> Correr horario
           </button>
+          <button className="btn ghost" onClick={openDuplicatePanel}>
+            <Copy size={18} /> Duplicar día
+          </button>
           {hubData && (
             <button className="btn ghost" onClick={handleAutoFill} disabled={autoFilling}>
               <Wand2 size={18} /> {autoFilling ? 'Rellenando...' : 'Rellenar auto'}
@@ -561,6 +617,46 @@ export default function AdminSchedule({ schedule, users, settings }) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {duplicateOpen && (
+        <div className="coverage-panel">
+          <h3>Duplicar horario del {day}</h3>
+          <div className="shift-days">
+            <span className="muted">Copiar a:</span>
+            {DAYS.slice(0, 6).filter(name => name !== day).map(name => (
+              <label key={name} className="day-check">
+                <input
+                  type="checkbox"
+                  checked={duplicateDays.includes(name)}
+                  onChange={() => toggleDuplicateDay(name)}
+                />
+                <span>{name}</span>
+              </label>
+            ))}
+            <button
+              type="button"
+              className="btn ghost small"
+              onClick={() => setDuplicateDays(DAYS.slice(0, 6).filter(name => name !== day))}
+            >
+              Todos
+            </button>
+          </div>
+          <label className="day-check replace-check">
+            <input
+              type="checkbox"
+              checked={duplicateReplace}
+              onChange={e => setDuplicateReplace(e.target.checked)}
+            />
+            <span>Reemplazar lo que ya exista en los días destino</span>
+          </label>
+          <div className="shift-controls">
+            <button className="btn primary" onClick={handleDuplicateDay} disabled={duplicating}>
+              {duplicating ? 'Duplicando...' : 'Duplicar horario'}
+            </button>
+          </div>
+          <p className="muted">Copia las mismas tareas, asistentes y horas del día seleccionado al escenario activo.</p>
         </div>
       )}
 

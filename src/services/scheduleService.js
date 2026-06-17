@@ -102,6 +102,59 @@ export async function shiftScheduleTasks(tasks, offsetMinutes) {
   return updates.length;
 }
 
+export async function duplicateScheduleDay(sourceTasks, targetDays, options = {}) {
+  if (!db) throw new Error('Firebase no está disponible.');
+  const cleanTargets = [...new Set((targetDays || []).map(normalizeDay).filter(day => DAYS.includes(day)))];
+  if (!cleanTargets.length) throw new Error('Selecciona al menos un día destino.');
+
+  const activeSource = (sourceTasks || [])
+    .filter(item => item?.active !== false)
+    .filter(item => item?.day && item?.startTime && item?.endTime && item?.task);
+  if (!activeSource.length) throw new Error('No hay tareas activas para duplicar en este día.');
+
+  const existingTargets = options.replaceExisting
+    ? (options.existingSchedule || [])
+      .filter(item => item?.id && item.active !== false)
+      .filter(item => cleanTargets.includes(item.day))
+    : [];
+
+  let copied = 0;
+  const writes = [];
+
+  for (const day of cleanTargets) {
+    for (const item of activeSource) {
+      const payload = normalizeSchedulePayload({ ...item, day });
+      const id = slugify(`${payload.day}-${payload.assistantName || payload.assistantEmail}-${payload.startTime}-${payload.task}`);
+      writes.push({ id, payload, source: item });
+      copied += 1;
+    }
+  }
+
+  const operations = [
+    ...existingTargets.map(item => ({ type: 'delete', id: item.id })),
+    ...writes.map(write => ({ type: 'set', ...write }))
+  ];
+
+  for (let i = 0; i < operations.length; i += 450) {
+    const batch = writeBatch(db);
+    for (const operation of operations.slice(i, i + 450)) {
+      if (operation.type === 'delete') {
+        batch.delete(appDoc(db, 'schedule', operation.id));
+      } else {
+        batch.set(appDoc(db, 'schedule', operation.id), {
+          ...operation.payload,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          duplicatedFrom: operation.source.id || null
+        }, { merge: true });
+      }
+    }
+    await batch.commit();
+  }
+
+  return copied;
+}
+
 export async function deleteScheduleTask(taskId) {
   if (!db || !taskId) throw new Error('Falta la tarea.');
   await deleteDoc(appDoc(db, 'schedule', taskId));
