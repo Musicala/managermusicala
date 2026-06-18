@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Bell, Plus, Save, Trash2, UserPlus, Volume2 } from 'lucide-react';
 import { deleteAssistantAccount, listenAssistantAccounts, saveAssistantAccount } from '../services/assistantAccountsService';
 import { BUTTON_SECTION_OPTIONS, normalizeButtonSections } from '../utils/normalize';
@@ -47,7 +47,7 @@ const SOUND_PROFILE_LABELS = {
   assertive: 'Insistente'
 };
 
-export default function ManagerSettings() {
+export default function ManagerSettings({ users = [] }) {
   const [settings, setSettings] = useState(DEFAULT_MANAGER_SETTINGS);
   const [templates, setTemplates] = useState([]);
   const [assistantAccounts, setAssistantAccounts] = useState([]);
@@ -66,6 +66,17 @@ export default function ManagerSettings() {
       unsubAssistants();
     };
   }, []);
+
+  // Nombres de asistentes activas, igual que en el horario del administrador,
+  // para elegir la asistente sugerida desde una lista y evitar errores de tipeo.
+  const assistantOptions = useMemo(() => {
+    const names = users
+      .filter(user => user.active !== false)
+      .filter(user => user.role === 'asistente')
+      .map(user => user.displayName || user.username || user.email)
+      .filter(Boolean);
+    return [...new Set(names)].sort((a, b) => String(a).localeCompare(String(b), 'es'));
+  }, [users]);
 
   function setField(field, value) {
     setSettings(current => ({ ...current, [field]: value }));
@@ -548,7 +559,18 @@ export default function ManagerSettings() {
             </label>
             <label>
               <span>Asistente sugerida</span>
-              <input value={template.suggestedOwner} onChange={e => setTemplate(current => ({ ...current, suggestedOwner: e.target.value }))} placeholder="Camila Rodriguez o Liz Rincon" />
+              <select
+                value={template.suggestedOwner || ''}
+                onChange={e => setTemplate(current => ({ ...current, suggestedOwner: e.target.value }))}
+              >
+                <option value="">Cualquiera (sin asignar)</option>
+                {assistantOptions.map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+                {template.suggestedOwner && !assistantOptions.includes(template.suggestedOwner) && (
+                  <option value={template.suggestedOwner}>{template.suggestedOwner} (anterior)</option>
+                )}
+              </select>
             </label>
           </div>
           <label>

@@ -297,7 +297,7 @@ export default function App() {
           )}
           {activeView === 'data' && effectiveIsAdmin && <DataManager buttons={buttons} settings={managerSettings} />}
           {activeView === 'users' && effectiveIsAdmin && <UsersAdmin users={users} buttons={buttons} />}
-          {activeView === 'settings' && effectiveIsAdmin && <ManagerSettings />}
+          {activeView === 'settings' && effectiveIsAdmin && <ManagerSettings users={users} />}
         </div>
       </main>
     </div>
