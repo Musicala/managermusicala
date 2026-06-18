@@ -21,6 +21,7 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [duplicateDays, setDuplicateDays] = useState([]);
   const [duplicateScenario, setDuplicateScenario] = useState(settings?.activeScenario || 'normal');
+  const [duplicateAssistant, setDuplicateAssistant] = useState('');
   const [duplicateReplace, setDuplicateReplace] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [shiftDays, setShiftDays] = useState([]);
@@ -517,6 +518,7 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
     setCoverageOpen(false);
     setShiftOpen(false);
     setDuplicateScenario(activeScenario);
+    setDuplicateAssistant('');
     setDuplicateDays(current => current.filter(name => name !== day));
   }
 
@@ -531,29 +533,40 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
         : 'Selecciona al menos un día destino.');
       return;
     }
+    const selectedAssistant = assistants.find(item => normalizeKey(item.email || item.name) === duplicateAssistant);
     const sourceItems = schedule
       .filter(item => item.active !== false)
-      .filter(item => item.day === day);
+      .filter(item => item.day === day)
+      .filter(item => (selectedAssistant ? scheduleItemMatchesAssistant(item, selectedAssistant) : true));
     if (!sourceItems.length) {
-      setError(`No hay tareas activas para duplicar del ${day}.`);
+      setError(selectedAssistant
+        ? `No hay tareas activas de ${selectedAssistant.name} para duplicar del ${day}.`
+        : `No hay tareas activas para duplicar del ${day}.`);
       return;
     }
     const scenarioName = scenarios.find(item => normalizeKey(item.id) === normalizeKey(duplicateScenario))?.name || duplicateScenario;
     const scenarioText = sameScenario ? '' : ` al escenario "${scenarioName}"`;
-    const replaceText = duplicateReplace ? ' Se reemplazará el horario que ya exista en esos días.' : '';
-    const ok = window.confirm(`¿Duplicar ${sourceItems.length} tarea(s) del ${day} a ${targets.join(', ')}${scenarioText}?${replaceText}`);
+    const whoText = selectedAssistant ? ` de ${selectedAssistant.name}` : '';
+    const replaceText = duplicateReplace
+      ? (selectedAssistant
+        ? ` Se reemplazarán las tareas de ${selectedAssistant.name} que ya existan en esos días.`
+        : ' Se reemplazará el horario que ya exista en esos días.')
+      : '';
+    const ok = window.confirm(`¿Duplicar ${sourceItems.length} tarea(s)${whoText} del ${day} a ${targets.join(', ')}${scenarioText}?${replaceText}`);
     if (!ok) return;
 
     setDuplicating(true);
     setError('');
     setNotice('');
     try {
+      const existingForReplace = (allSchedule || schedule)
+        .filter(item => (selectedAssistant ? scheduleItemMatchesAssistant(item, selectedAssistant) : true));
       const count = await duplicateScheduleDay(sourceItems, targets, {
         replaceExisting: duplicateReplace,
-        existingSchedule: allSchedule || schedule,
+        existingSchedule: existingForReplace,
         targetScenario: duplicateScenario
       });
-      setNotice(`Se duplicaron ${count} tarea(s) del ${day} a ${targets.join(', ')}${scenarioText}.`);
+      setNotice(`Se duplicaron ${count} tarea(s)${whoText} del ${day} a ${targets.join(', ')}${scenarioText}.`);
       setDuplicateOpen(false);
       setDuplicateDays([]);
     } catch (err) {
@@ -752,6 +765,17 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
         <div className="coverage-panel">
           <h3>Duplicar horario del {day}</h3>
           <div className="shift-controls">
+            <label>
+              <span>Asistente</span>
+              <select value={duplicateAssistant} onChange={e => setDuplicateAssistant(e.target.value)}>
+                <option value="">Todas</option>
+                {assistants.map(item => (
+                  <option key={item.email || item.name} value={normalizeKey(item.email || item.name)}>
+                    {item.name || item.email}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label>
               <span>Escenario destino</span>
               <select value={duplicateScenario} onChange={e => setDuplicateScenario(e.target.value)}>
