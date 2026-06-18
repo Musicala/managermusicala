@@ -3,6 +3,7 @@ import { Briefcase, CheckCircle2, Circle, Clock, Copy, Link2, Plus, Wand2 } from
 import { saveScheduleTask, deleteScheduleTask, shiftScheduleTasks, duplicateScheduleDay } from '../services/scheduleService';
 import { DEFAULT_MANAGER_SETTINGS, listenTaskTemplates, saveManagerSettings } from '../services/managerConfigService';
 import { connectHub, hubScheduleForDay, listenHubSchedules, listenHubUser, matchHubMember } from '../services/hubService';
+import { isLunchItem } from '../utils/breaks';
 import { DAYS, normalizeKey, scheduleItemMatchesAssistant } from '../utils/normalize';
 import { TIMELINE_END, TIMELINE_START, SLOT_HEIGHT, durationLabel, findOverlaps, layoutOverlaps, minutesToTime, sortSchedule, timeToMinutes } from '../utils/time';
 import { CurrentTimeLine, DayTabs, TimelineCard } from './AssistantSchedule';
@@ -85,7 +86,9 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
         name: user.displayName || user.username || user.email,
         email: user.source === 'assistantAccount' ? '' : user.email,
         username: user.username || user.legacyUsername || '',
-        source: user.source
+        source: user.source,
+        lunchStart: user.lunchStart || '',
+        lunchMinutes: Number(user.lunchMinutes) || 60
       }))
       .sort((a, b) => String(a.name || a.email).localeCompare(String(b.name || b.email), 'es'));
   }, [users]);
@@ -102,6 +105,27 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
 
   function templateAppliesToAssistant(template, assistant) {
     return !template?.suggestedOwner || normalizeKey(template.suggestedOwner) === normalizeKey(assistant?.name);
+  }
+
+  // Ventana de almuerzo "fantasma" del asistente: solo si tiene hora configurada
+  // y todavía no hay una tarea de almuerzo ese día (si ya existe, se respeta esa).
+  function lunchWindowFor(assistant, dayItems) {
+    if (dayItems.some(isLunchItem)) return null;
+    const start = timeToMinutes(assistant?.lunchStart);
+    if (!Number.isFinite(start)) return null;
+    return { start, end: start + (Number(assistant?.lunchMinutes) || 60) };
+  }
+
+  // Quita la franja del almuerzo de una lista de huecos, partiéndolos si hace falta.
+  function clipGapsAroundLunch(gaps, lunch) {
+    if (!lunch) return gaps;
+    const out = [];
+    for (const [s, e] of gaps) {
+      if (lunch.end <= s || lunch.start >= e) { out.push([s, e]); continue; }
+      if (lunch.start > s) out.push([s, lunch.start]);
+      if (lunch.end < e) out.push([lunch.end, e]);
+    }
+    return out.filter(([s, e]) => e - s >= 5);
   }
 
   // Cobertura: qué tareas de la bolsa ya están asignadas en el día seleccionado (escenario activo).
@@ -183,12 +207,14 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
       if (jornada === undefined) continue;
       let outside = 0;
       const gaps = [];
+      let lunch = null;
       if (jornada) {
         const start = timeToMinutes(jornada.start);
         const end = timeToMinutes(jornada.end);
         const items = schedule
           .filter(item => item.active !== false && item.day === day)
           .filter(item => scheduleItemMatchesAssistant(item, assistant));
+        lunch = lunchWindowFor(assistant, items);
         outside = items
           .filter(item => timeToMinutes(item.startTime) < start || timeToMinutes(item.endTime) > end)
           .length;
@@ -206,8 +232,10 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
         }
         if (end - cursor >= 5) gaps.push([cursor, end]);
       }
-      const gapMinutes = gaps.reduce((sum, [s, e]) => sum + (e - s), 0);
-      out[normalizeKey(assistant.email || assistant.name)] = { jornada, outside, gaps, gapMinutes };
+      // El almuerzo no cuenta como hueco "sin tareas" ni se rellena automáticamente.
+      const clippedGaps = clipGapsAroundLunch(gaps, lunch);
+      const gapMinutes = clippedGaps.reduce((sum, [s, e]) => sum + (e - s), 0);
+      out[normalizeKey(assistant.email || assistant.name)] = { jornada, outside, gaps: clippedGaps, gapMinutes, lunch };
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -401,11 +429,24 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
       }
     }
 
-    if (!placements.length) {
-      setError('No hay huecos por rellenar, o ninguna tarea de la bolsa cabe en ellos. Marca tareas como repetibles para usarlas de relleno.');
+    // Almuerzos: crea la tarea fija de almuerzo si el asistente tiene hora común
+    // configurada y aún no hay una ese día. Queda como tarea editable/movible.
+    const lunchPlacements = [];
+    for (const assistant of assistants) {
+      const info = hubInfoByAssistant[normalizeKey(assistant.email || assistant.name)];
+      if (info?.lunch) {
+        lunchPlacements.push({ assistant, startMinutes: info.lunch.start, endMinutes: info.lunch.end });
+      }
+    }
+
+    if (!placements.length && !lunchPlacements.length) {
+      setError('No hay huecos por rellenar (ni almuerzos por crear), o ninguna tarea de la bolsa cabe en los huecos. Marca tareas como repetibles para usarlas de relleno.');
       return;
     }
-    const ok = window.confirm(`¿Asignar automáticamente ${placements.length} tarea(s) en los huecos del ${day}? Después puedes moverlas, editarlas o eliminarlas manualmente.`);
+    const summaryParts = [];
+    if (placements.length) summaryParts.push(`${placements.length} tarea(s) en los huecos`);
+    if (lunchPlacements.length) summaryParts.push(`${lunchPlacements.length} almuerzo(s)`);
+    const ok = window.confirm(`¿Asignar automáticamente ${summaryParts.join(' y ')} del ${day}? Después puedes moverlas, editarlas o eliminarlas manualmente.`);
     if (!ok) return;
 
     setAutoFilling(true);
@@ -426,10 +467,25 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
           scenario: settings?.activeScenario || 'normal'
         });
       }
+      for (const lunch of lunchPlacements) {
+        await saveScheduleTask({
+          day,
+          startTime: minutesToTime(lunch.startMinutes),
+          endTime: minutesToTime(lunch.endMinutes),
+          assistantName: lunch.assistant.name,
+          assistantEmail: lunch.assistant.email,
+          task: 'Almuerzo',
+          description: '',
+          category: 'Descanso',
+          color: 'naranja',
+          scenario: settings?.activeScenario || 'normal'
+        });
+      }
       const adjustedNote = adjustedCount
         ? ` Había tareas de mayor duración (p. ej. de 1 hora), así que ${adjustedCount} se ajustaron al tiempo restante (p. ej. 30 min) para completar el horario.`
         : '';
-      setNotice(`Se asignaron ${placements.length} tarea(s) automáticamente en los huecos del ${day}.${adjustedNote}`);
+      const lunchNote = lunchPlacements.length ? ` Se agregó el almuerzo de ${lunchPlacements.length} asistente(s).` : '';
+      setNotice(`Se asignaron ${placements.length} tarea(s) automáticamente en los huecos del ${day}.${adjustedNote}${lunchNote}`);
     } catch (err) {
       setError(err.message || 'No se pudo rellenar el horario.');
     } finally {

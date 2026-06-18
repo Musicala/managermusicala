@@ -31,6 +31,8 @@ const EMPTY_ASSISTANT = {
   username: '',
   displayName: '',
   password: '',
+  lunchStart: '',
+  lunchMinutes: 60,
   active: true
 };
 
@@ -496,6 +498,14 @@ export default function ManagerSettings({ users = [] }) {
               <span>Contraseña</span>
               <input value={assistantDraft.password} onChange={e => setAssistantDraft(current => ({ ...current, password: e.target.value }))} placeholder="Clave interna" />
             </label>
+            <label>
+              <span>Hora de almuerzo</span>
+              <input type="time" value={assistantDraft.lunchStart || ''} onChange={e => setAssistantDraft(current => ({ ...current, lunchStart: e.target.value }))} />
+            </label>
+            <label>
+              <span>Duración almuerzo (min)</span>
+              <input type="number" min="15" step="15" value={assistantDraft.lunchMinutes ?? 60} onChange={e => setAssistantDraft(current => ({ ...current, lunchMinutes: Number(e.target.value) }))} />
+            </label>
             <label className="checkbox-label">
               <input type="checkbox" checked={assistantDraft.active} onChange={e => setAssistantDraft(current => ({ ...current, active: e.target.checked }))} />
               <span>Activo</span>
@@ -510,7 +520,10 @@ export default function ManagerSettings({ users = [] }) {
             <div className="task-template assistant-account-row" key={account.id}>
               <div>
                 <strong>{account.displayName || account.username}</strong>
-                <span>{account.username} · {account.active === false ? 'Inactivo' : 'Activo'}</span>
+                <span>
+                  {account.username} · {account.active === false ? 'Inactivo' : 'Activo'}
+                  {account.lunchStart ? ` · 🍽 almuerzo ${account.lunchStart} (${account.lunchMinutes || 60} min)` : ''}
+                </span>
               </div>
               <div className="right-actions">
                 <button className="btn ghost" onClick={() => setAssistantDraft({
@@ -518,6 +531,8 @@ export default function ManagerSettings({ users = [] }) {
                   username: account.username || '',
                   displayName: account.displayName || '',
                   password: account.password || '',
+                  lunchStart: account.lunchStart || '',
+                  lunchMinutes: account.lunchMinutes ?? 60,
                   active: account.active !== false
                 })}>Editar</button>
                 <button className="btn danger" onClick={() => removeAssistant(account)}><Trash2 size={16} /> Eliminar</button>

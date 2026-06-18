@@ -2,6 +2,7 @@ import { deleteDoc, getDocs, onSnapshot, serverTimestamp, setDoc } from 'firebas
 import { db } from '../firebase/firebase';
 import { appCollection, appDoc } from '../firebase/dbPaths';
 import { normalizeText, slugify } from '../utils/normalize';
+import { normalizeTime } from '../utils/time';
 
 export function listenAssistantAccounts(callback) {
   if (!db) return () => {};
@@ -23,6 +24,8 @@ export async function saveAssistantAccount(account) {
     displayName: normalizeText(account.displayName) || username,
     password: normalizeText(account.password),
     role: 'asistente',
+    lunchStart: normalizeTime(account.lunchStart) || '',
+    lunchMinutes: Number(account.lunchMinutes) || 60,
     active: account.active !== false,
     updatedAt: serverTimestamp(),
     createdAt: account.createdAt || serverTimestamp()
