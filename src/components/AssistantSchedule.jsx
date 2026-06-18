@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock } from 'lucide-react';
 import { DAYS, scheduleItemMatchesAssistant } from '../utils/normalize';
-import { blockStyle, getTodayName, minutesToTime, nowMinutes, TIMELINE_END, TIMELINE_START, SLOT_HEIGHT, sortSchedule, timeToMinutes } from '../utils/time';
+import { blockStyle, getTodayName, layoutOverlaps, minutesToTime, nowMinutes, TIMELINE_END, TIMELINE_START, SLOT_HEIGHT, sortSchedule, timeToMinutes } from '../utils/time';
 import { calculateBreaks } from '../utils/breaks';
 
 export default function AssistantSchedule({ schedule, user, settings }) {
@@ -47,6 +47,7 @@ export function DayTabs({ active, onChange }) {
 export function Timeline({ day, items, emptyTitle = 'Sin tareas' }) {
   const hours = [];
   for (let h = TIMELINE_START; h <= TIMELINE_END; h += 1) hours.push(h);
+  const layout = layoutOverlaps(items.filter(item => item.type !== 'break'));
 
   return (
     <div className="timeline-wrap single">
@@ -57,7 +58,17 @@ export function Timeline({ day, items, emptyTitle = 'Sin tareas' }) {
       <div className="timeline-column" style={{ height: `${(TIMELINE_END - TIMELINE_START + 1) * SLOT_HEIGHT * 2}px` }}>
         {hours.map(hour => <div key={hour} className="hour-line" style={{ top: `${(hour - TIMELINE_START) * SLOT_HEIGHT * 2}px` }} />)}
         <CurrentTimeLine day={day} items={items} />
-        {items.map(item => <TimelineCard key={item.id} item={item} />)}
+        {items.map(item => {
+          const cardLayout = layout.get(item.id);
+          return (
+            <TimelineCard
+              key={item.id}
+              item={item}
+              layout={cardLayout}
+              conflict={Boolean(cardLayout && cardLayout.lanes > 1)}
+            />
+          );
+        })}
         {!items.length && (
           <div className="timeline-empty">
             <CalendarClock size={34} />
@@ -101,17 +112,30 @@ export function CurrentTimeLine({ day, items = [] }) {
   );
 }
 
-export function TimelineCard({ item, onClick }) {
+export function TimelineCard({ item, onClick, layout, conflict = false }) {
   const isBreak = item.type === 'break';
   const style = blockStyle(item.startTime, item.endTime || item.startTime);
   const minutes = item.endTime ? timeToMinutes(item.endTime) - timeToMinutes(item.startTime) : 15;
-  const cardStyle = isBreak
+  let cardStyle = isBreak
     ? { ...style, height: '34px', minHeight: '34px' }
     : { ...style, minHeight: style.height };
 
+  // Si la tarea se cruza con otra(s), se reparte el ancho en columnas para que
+  // todas se vean lado a lado en vez de quedar una encima de la otra.
+  if (!isBreak && layout && layout.lanes > 1) {
+    const gap = 4;
+    const width = `calc((100% - 24px - ${gap * (layout.lanes - 1)}px) / ${layout.lanes})`;
+    cardStyle = {
+      ...cardStyle,
+      left: `calc(12px + (${width} + ${gap}px) * ${layout.lane})`,
+      right: 'auto',
+      width
+    };
+  }
+
   return (
     <button
-      className={`timeline-card color-${item.color || (isBreak ? 'verde' : 'azul')} ${isBreak ? 'break-card' : ''}`}
+      className={`timeline-card color-${item.color || (isBreak ? 'verde' : 'azul')} ${isBreak ? 'break-card' : ''} ${conflict ? 'conflict' : ''}`}
       style={cardStyle}
       onClick={onClick}
       type="button"

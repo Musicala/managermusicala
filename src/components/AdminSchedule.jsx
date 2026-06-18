@@ -4,7 +4,7 @@ import { saveScheduleTask, deleteScheduleTask, shiftScheduleTasks, duplicateSche
 import { DEFAULT_MANAGER_SETTINGS, listenTaskTemplates, saveManagerSettings } from '../services/managerConfigService';
 import { connectHub, hubScheduleForDay, listenHubSchedules, listenHubUser, matchHubMember } from '../services/hubService';
 import { DAYS, normalizeKey, scheduleItemMatchesAssistant } from '../utils/normalize';
-import { TIMELINE_END, TIMELINE_START, SLOT_HEIGHT, durationLabel, minutesToTime, sortSchedule, timeToMinutes } from '../utils/time';
+import { TIMELINE_END, TIMELINE_START, SLOT_HEIGHT, durationLabel, findOverlaps, layoutOverlaps, minutesToTime, sortSchedule, timeToMinutes } from '../utils/time';
 import { CurrentTimeLine, DayTabs, TimelineCard } from './AssistantSchedule';
 import TaskModal from './TaskModal';
 
@@ -212,6 +212,65 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assistants, hubData, schedule, day, settings]);
+
+  // Reglas de ubicación por tarea (p. ej. "cierre comercial" en los últimos 30 min).
+  const ruleByTask = useMemo(() => {
+    const map = {};
+    for (const template of taskTemplates) {
+      const rule = template.placementRule;
+      if (rule === 'inicio' || rule === 'fin') {
+        map[normalizeKey(template.name)] = { rule, minutes: Number(template.placementMinutes) || 30 };
+      }
+    }
+    return map;
+  }, [taskTemplates]);
+
+  // Análisis del día por asistente: columnas para cruces, pares cruzados y
+  // tareas que incumplen su regla de ubicación.
+  const analysisByAssistant = useMemo(() => {
+    const out = {};
+    for (const assistant of assistants) {
+      const key = normalizeKey(assistant.email || assistant.name);
+      const items = schedule
+        .filter(item => item.active !== false && item.day === day)
+        .filter(item => scheduleItemMatchesAssistant(item, assistant))
+        .sort(sortSchedule);
+
+      const layout = layoutOverlaps(items);
+      const overlaps = findOverlaps(items);
+      const conflictIds = new Set(overlaps.flatMap(([a, b]) => [a.id, b.id]));
+
+      // Límites del día: jornada del Hub si existe, si no el rango de las tareas.
+      const jornada = hubInfoByAssistant[key]?.jornada;
+      const starts = items.map(item => timeToMinutes(item.startTime)).filter(Number.isFinite);
+      const ends = items.map(item => timeToMinutes(item.endTime)).filter(Number.isFinite);
+      const dayStart = jornada ? timeToMinutes(jornada.start) : (starts.length ? Math.min(...starts) : null);
+      const dayEnd = jornada ? timeToMinutes(jornada.end) : (ends.length ? Math.max(...ends) : null);
+
+      const ruleWarnings = [];
+      for (const item of items) {
+        const rule = ruleByTask[normalizeKey(item.task)];
+        if (!rule || dayStart == null || dayEnd == null) continue;
+        const start = timeToMinutes(item.startTime);
+        const end = timeToMinutes(item.endTime);
+        if (rule.rule === 'fin' && (end < dayEnd || start < dayEnd - rule.minutes)) {
+          ruleWarnings.push({
+            id: item.id,
+            message: `"${item.task}" debería ir en los últimos ${rule.minutes} min del día (cierre ${minutesToTime(dayEnd)}), no en ${item.startTime}–${item.endTime}.`
+          });
+        }
+        if (rule.rule === 'inicio' && (start > dayStart || end > dayStart + rule.minutes)) {
+          ruleWarnings.push({
+            id: item.id,
+            message: `"${item.task}" debería ir en los primeros ${rule.minutes} min del día (apertura ${minutesToTime(dayStart)}), no en ${item.startTime}–${item.endTime}.`
+          });
+        }
+      }
+      const ruleIds = new Set(ruleWarnings.map(warning => warning.id));
+      out[key] = { items, layout, overlaps, conflictIds, ruleWarnings, ruleIds };
+    }
+    return out;
+  }, [assistants, schedule, day, ruleByTask, hubInfoByAssistant]);
 
   // Corre todas las tareas del día de una asistente para que entren en su jornada del Hub.
   async function handleFitToJornada(assistant, jornada) {
@@ -766,12 +825,23 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
           <div className="assistant-head muted">Hora</div>
           {assistants.map(assistant => {
             const hubInfo = hubInfoByAssistant[normalizeKey(assistant.email || assistant.name)];
+            const analysis = analysisByAssistant[normalizeKey(assistant.email || assistant.name)];
             const subtitle = assistant.email || assistant.username || '';
             const subtitleRedundant = !subtitle || normalizeKey(subtitle) === normalizeKey(assistant.name);
             return (
               <div className="assistant-head" key={assistant.username || assistant.email || assistant.name}>
                 <strong>{assistant.name || assistant.email}</strong>
                 {!subtitleRedundant && <span>{subtitle}</span>}
+                {analysis?.overlaps.length > 0 && (
+                  <span className="hub-chip warn" title={analysis.overlaps.map(([a, b]) => `${a.task} (${a.startTime}-${a.endTime}) ✕ ${b.task} (${b.startTime}-${b.endTime})`).join('\n')}>
+                    ⚠ {analysis.overlaps.length} cruce(s): {analysis.overlaps.map(([a, b]) => `${a.startTime}-${a.endTime} ✕ ${b.startTime}-${b.endTime}`).join(' · ')}
+                  </span>
+                )}
+                {analysis?.ruleWarnings.map(warning => (
+                  <span className="hub-chip warn" key={warning.id} title={warning.message}>
+                    ⚠ {warning.message}
+                  </span>
+                ))}
                 {hubInfo && (
                   hubInfo.jornada ? (
                     <>
@@ -813,17 +883,22 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
               normalizeKey(assistant.name),
               normalizeKey(assistant.username)
             ].filter(Boolean);
-            const items = schedule
-              .filter(item => item.active !== false)
-              .filter(item => item.day === day)
-              .filter(item => scheduleItemMatchesAssistant(item, assistant))
-              .sort(sortSchedule);
+            const analysis = analysisByAssistant[normalizeKey(assistant.email || assistant.name)];
+            const items = analysis?.items || [];
             return (
               <div className="timeline-column admin-col" key={keys[0]} style={{ height: `${(TIMELINE_END - TIMELINE_START + 1) * SLOT_HEIGHT * 2}px` }}>
                 {hours.map(hour => <div key={hour} className="hour-line" style={{ top: `${(hour - TIMELINE_START) * SLOT_HEIGHT * 2}px` }} />)}
                 <CurrentTimeLine day={day} items={items} />
                 <button className="quick-add" onClick={() => setEditing({ day, assistantName: assistant.name, assistantEmail: assistant.email, scenario: settings?.activeScenario || 'normal' })}>+ agregar</button>
-                {items.map(item => <TimelineCard key={item.id} item={item} onClick={() => setEditing(item)} />)}
+                {items.map(item => (
+                  <TimelineCard
+                    key={item.id}
+                    item={item}
+                    layout={analysis?.layout.get(item.id)}
+                    conflict={Boolean(analysis?.conflictIds.has(item.id) || analysis?.ruleIds.has(item.id))}
+                    onClick={() => setEditing(item)}
+                  />
+                ))}
               </div>
             );
           })}

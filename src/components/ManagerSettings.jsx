@@ -21,6 +21,8 @@ const EMPTY_TEMPLATE = {
   durationMinutes: 30,
   priority: 'Media',
   suggestedOwner: '',
+  placementRule: '',
+  placementMinutes: 30,
   repeatable: false,
   active: true
 };
@@ -577,6 +579,28 @@ export default function ManagerSettings({ users = [] }) {
             <span>Descripcion</span>
             <textarea value={template.description} onChange={e => setTemplate(current => ({ ...current, description: e.target.value }))} placeholder="Instrucciones o criterio de exito" />
           </label>
+          <div className="form-grid two">
+            <label>
+              <span>Regla de ubicación</span>
+              <select value={template.placementRule || ''} onChange={e => setTemplate(current => ({ ...current, placementRule: e.target.value }))}>
+                <option value="">Sin regla (cualquier hora)</option>
+                <option value="inicio">Al inicio del día (apertura)</option>
+                <option value="fin">Al final del día (cierre)</option>
+              </select>
+            </label>
+            {template.placementRule && (
+              <label>
+                <span>Ventana en minutos</span>
+                <input
+                  type="number"
+                  min="5"
+                  step="5"
+                  value={template.placementMinutes}
+                  onChange={e => setTemplate(current => ({ ...current, placementMinutes: Number(e.target.value) }))}
+                />
+              </label>
+            )}
+          </div>
           <label className="checkbox-label">
             <input
               type="checkbox"
@@ -605,6 +629,8 @@ export default function ManagerSettings({ users = [] }) {
                 <span>
                   {item.category} · {item.frequency} · {item.durationMinutes || 30} min
                   {item.repeatable ? ' · 🔁 repetible' : ''}
+                  {item.placementRule === 'fin' ? ` · 🔒 cierre (últimos ${item.placementMinutes || 30} min)` : ''}
+                  {item.placementRule === 'inicio' ? ` · 🔓 apertura (primeros ${item.placementMinutes || 30} min)` : ''}
                 </span>
                 {item.description && <span className="task-template-desc">{item.description}</span>}
               </div>

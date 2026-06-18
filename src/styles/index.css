@@ -146,6 +146,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--vivaldi); backgr
 .timeline-card.color-naranja { border-left-color: var(--warning); background: #fff7ed; color: #9a3412; }
 .timeline-card.color-rosado { border-left-color: var(--brahms); background: #fdf2f8; color: #9d174d; }
 .timeline-card.color-gris { border-left-color: #64748b; background: #f8fafc; color: #334155; }
+.timeline-card.conflict { outline: 2px solid var(--warning); outline-offset: -1px; box-shadow: 0 0 0 3px rgba(245,158,11,.18), 0 8px 22px rgba(76,29,149,.08); z-index: 5; }
 .break-card {
   left: auto;
   right: 14px;

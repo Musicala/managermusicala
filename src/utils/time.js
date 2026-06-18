@@ -79,3 +79,67 @@ export function blockStyle(startTime, endTime) {
     height: `${height}px`
   };
 }
+
+// Reparte en columnas (carriles) las tareas que se cruzan en el tiempo, para
+// poder dibujarlas lado a lado en vez de una encima de otra. Devuelve un Map
+// id -> { lane, lanes } donde lane es la columna (0..n) y lanes el total de
+// columnas del grupo que se solapa.
+export function layoutOverlaps(items = []) {
+  const result = new Map();
+  const sorted = items
+    .map(item => ({
+      item,
+      start: timeToMinutes(item.startTime),
+      end: timeToMinutes(item.endTime || item.startTime)
+    }))
+    .filter(node => Number.isFinite(node.start) && Number.isFinite(node.end))
+    .sort((a, b) => a.start - b.start || a.end - b.end);
+
+  let cluster = [];
+  let clusterEnd = -Infinity;
+
+  const flush = () => {
+    if (!cluster.length) return;
+    const columnEnds = [];
+    for (const node of cluster) {
+      let lane = columnEnds.findIndex(end => end <= node.start);
+      if (lane === -1) {
+        lane = columnEnds.length;
+        columnEnds.push(node.end);
+      } else {
+        columnEnds[lane] = node.end;
+      }
+      node.lane = lane;
+    }
+    const lanes = columnEnds.length;
+    for (const node of cluster) {
+      result.set(node.item.id, { lane: node.lane, lanes });
+    }
+    cluster = [];
+    clusterEnd = -Infinity;
+  };
+
+  for (const node of sorted) {
+    if (cluster.length && node.start >= clusterEnd) flush();
+    cluster.push(node);
+    clusterEnd = Math.max(clusterEnd, node.end);
+  }
+  flush();
+  return result;
+}
+
+// Pares de tareas que se cruzan (se solapan en el tiempo), para avisar.
+export function findOverlaps(items = []) {
+  const sorted = items
+    .map(item => ({ item, start: timeToMinutes(item.startTime), end: timeToMinutes(item.endTime || item.startTime) }))
+    .filter(node => Number.isFinite(node.start) && Number.isFinite(node.end) && node.end > node.start)
+    .sort((a, b) => a.start - b.start);
+  const conflicts = [];
+  for (let i = 0; i < sorted.length; i += 1) {
+    for (let j = i + 1; j < sorted.length; j += 1) {
+      if (sorted[j].start >= sorted[i].end) break;
+      conflicts.push([sorted[i].item, sorted[j].item]);
+    }
+  }
+  return conflicts;
+}

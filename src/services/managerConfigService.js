@@ -116,6 +116,8 @@ export async function saveTaskTemplate(template) {
     priority: String(template.priority || 'Media').trim(),
     repeatable: template.repeatable === true,
     suggestedOwner: String(template.suggestedOwner || '').trim(),
+    placementRule: ['inicio', 'fin'].includes(template.placementRule) ? template.placementRule : '',
+    placementMinutes: Number(template.placementMinutes) || 30,
     active: template.active !== false,
     updatedAt: serverTimestamp(),
     createdAt: template.createdAt || serverTimestamp()
