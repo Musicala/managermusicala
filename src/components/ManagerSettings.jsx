@@ -130,6 +130,45 @@ export default function ManagerSettings() {
     setSettings(current => ({ ...current, buttonSections: BUTTON_SECTION_OPTIONS }));
   }
 
+  function scenarioList(current) {
+    const list = Array.isArray(current.scenarios) && current.scenarios.length
+      ? current.scenarios
+      : DEFAULT_MANAGER_SETTINGS.scenarios;
+    return list;
+  }
+
+  function updateScenarioName(index, value) {
+    setSettings(current => {
+      const scenarios = [...scenarioList(current)];
+      scenarios[index] = { ...scenarios[index], name: value };
+      return { ...current, scenarios };
+    });
+  }
+
+  function addScenario() {
+    setSettings(current => ({
+      ...current,
+      scenarios: [
+        ...scenarioList(current),
+        { id: `escenario-${Date.now()}`, name: 'Nuevo escenario' }
+      ]
+    }));
+  }
+
+  function removeScenario(index) {
+    const current = settings;
+    const scenarios = scenarioList(current);
+    if (scenarios.length <= 1) return;
+    const removed = scenarios[index];
+    const ok = window.confirm(`¿Eliminar el escenario "${removed.name}"? Las tareas guardadas en ese escenario dejarán de mostrarse, pero no se borran.`);
+    if (!ok) return;
+    setSettings(prev => {
+      const list = scenarioList(prev).filter((_, itemIndex) => itemIndex !== index);
+      const activeScenario = prev.activeScenario === removed.id ? list[0].id : prev.activeScenario;
+      return { ...prev, scenarios: list, activeScenario };
+    });
+  }
+
   async function saveSettings() {
     setSaving(true);
     setMessage('');
@@ -370,6 +409,53 @@ export default function ManagerSettings() {
             </button>
             <button className="btn primary" onClick={saveSettings} disabled={saving}>
               <Save size={17} /> {saving ? 'Guardando...' : 'Guardar secciones'}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="module-card wide">
+        <div className="module-header">
+          <div>
+            <p className="eyebrow">Horarios</p>
+            <h2>Escenarios de horario</h2>
+          </div>
+          <button className="btn ghost" type="button" onClick={addScenario}>
+            <Plus size={16} /> Agregar escenario
+          </button>
+        </div>
+        <div className="settings-body">
+          <p className="muted">
+            Los escenarios son versiones del horario semanal (por ejemplo normal, redistribuido o vacacional).
+            El escenario activo se elige desde el horario del administrador.
+          </p>
+          <div className="notification-message-list">
+            {scenarioList(settings).map((scenario, index) => (
+              <div className="notification-message-row button-section-row" key={scenario.id || index}>
+                <label>
+                  <span>Nombre del escenario{scenario.id === settings.activeScenario ? ' · activo' : ''}</span>
+                  <input
+                    value={scenario.name || ''}
+                    onChange={e => updateScenarioName(index, e.target.value)}
+                    placeholder="Horario vacacional"
+                  />
+                </label>
+                <div className="right-actions">
+                  <button
+                    className="btn danger"
+                    type="button"
+                    onClick={() => removeScenario(index)}
+                    disabled={scenarioList(settings).length <= 1}
+                  >
+                    <Trash2 size={16} /> Eliminar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="right-actions">
+            <button className="btn primary" onClick={saveSettings} disabled={saving}>
+              <Save size={17} /> {saving ? 'Guardando...' : 'Guardar escenarios'}
             </button>
           </div>
         </div>

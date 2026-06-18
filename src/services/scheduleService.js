@@ -51,13 +51,20 @@ export function normalizeSchedulePayload(input) {
   };
 }
 
+// Id del documento de horario. Incluye el escenario para que la "misma" tarea
+// pueda existir en varios escenarios (p. ej. normal y vacacional) sin pisarse.
+function scheduleDocId(payload) {
+  const scenario = payload.scenario || 'normal';
+  return slugify(`${scenario}-${payload.day}-${payload.assistantName || payload.assistantEmail}-${payload.startTime}-${payload.task}`);
+}
+
 export async function saveScheduleTask(input) {
   if (!db) throw new Error('Firebase no está disponible.');
   const payload = normalizeSchedulePayload(input);
   if (!payload.assistantName && !payload.assistantEmail) throw new Error('La tarea necesita asistente.');
   if (!payload.task) throw new Error('La tarea necesita nombre.');
 
-  const id = normalizeText(input.id) || slugify(`${payload.day}-${payload.assistantName || payload.assistantEmail}-${payload.startTime}-${payload.task}`);
+  const id = normalizeText(input.id) || scheduleDocId(payload);
   await setDoc(appDoc(db, 'schedule', id), {
     ...payload,
     createdAt: input.createdAt || serverTimestamp(),
@@ -112,10 +119,18 @@ export async function duplicateScheduleDay(sourceTasks, targetDays, options = {}
     .filter(item => item?.day && item?.startTime && item?.endTime && item?.task);
   if (!activeSource.length) throw new Error('No hay tareas activas para duplicar en este día.');
 
+  // Escenario destino: si se indica, las copias se mueven a ese escenario; si no,
+  // se conserva el escenario de cada tarea de origen (comportamiento anterior).
+  const targetScenario = options.targetScenario
+    ? normalizeText(options.targetScenario).toLowerCase()
+    : null;
+
   const existingTargets = options.replaceExisting
     ? (options.existingSchedule || [])
       .filter(item => item?.id && item.active !== false)
       .filter(item => cleanTargets.includes(item.day))
+      .filter(item => !targetScenario
+        || normalizeText(item.scenario || 'normal').toLowerCase() === targetScenario)
     : [];
 
   let copied = 0;
@@ -123,8 +138,8 @@ export async function duplicateScheduleDay(sourceTasks, targetDays, options = {}
 
   for (const day of cleanTargets) {
     for (const item of activeSource) {
-      const payload = normalizeSchedulePayload({ ...item, day });
-      const id = slugify(`${payload.day}-${payload.assistantName || payload.assistantEmail}-${payload.startTime}-${payload.task}`);
+      const payload = normalizeSchedulePayload({ ...item, day, scenario: targetScenario || item.scenario });
+      const id = scheduleDocId(payload);
       writes.push({ id, payload, source: item });
       copied += 1;
     }

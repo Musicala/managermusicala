@@ -8,7 +8,7 @@ import { TIMELINE_END, TIMELINE_START, SLOT_HEIGHT, durationLabel, minutesToTime
 import { CurrentTimeLine, DayTabs, TimelineCard } from './AssistantSchedule';
 import TaskModal from './TaskModal';
 
-export default function AdminSchedule({ schedule, users, settings }) {
+export default function AdminSchedule({ schedule, allSchedule, users, settings }) {
   const [day, setDay] = useState(() => DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1] || 'Lunes');
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -19,6 +19,7 @@ export default function AdminSchedule({ schedule, users, settings }) {
   const [shiftOpen, setShiftOpen] = useState(false);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [duplicateDays, setDuplicateDays] = useState([]);
+  const [duplicateScenario, setDuplicateScenario] = useState(settings?.activeScenario || 'normal');
   const [duplicateReplace, setDuplicateReplace] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [shiftDays, setShiftDays] = useState([]);
@@ -88,6 +89,9 @@ export default function AdminSchedule({ schedule, users, settings }) {
       }))
       .sort((a, b) => String(a.name || a.email).localeCompare(String(b.name || b.email), 'es'));
   }, [users]);
+
+  const activeScenario = settings?.activeScenario || 'normal';
+  const scenarios = settings?.scenarios || DEFAULT_MANAGER_SETTINGS.scenarios;
 
   const hours = [];
   for (let h = TIMELINE_START; h <= TIMELINE_END; h += 1) hours.push(h);
@@ -397,13 +401,19 @@ export default function AdminSchedule({ schedule, users, settings }) {
     setDuplicateOpen(open => !open);
     setCoverageOpen(false);
     setShiftOpen(false);
+    setDuplicateScenario(activeScenario);
     setDuplicateDays(current => current.filter(name => name !== day));
   }
 
   async function handleDuplicateDay() {
-    const targets = duplicateDays.filter(name => name !== day);
+    // Solo cuando el escenario destino es el activo no tiene sentido duplicar el
+    // día sobre sí mismo; entre escenarios distintos sí se permite el mismo día.
+    const sameScenario = normalizeKey(duplicateScenario) === normalizeKey(activeScenario);
+    const targets = sameScenario ? duplicateDays.filter(name => name !== day) : duplicateDays;
     if (!targets.length) {
-      setError('Selecciona al menos un día destino distinto al día actual.');
+      setError(sameScenario
+        ? 'Selecciona al menos un día destino distinto al día actual.'
+        : 'Selecciona al menos un día destino.');
       return;
     }
     const sourceItems = schedule
@@ -413,8 +423,10 @@ export default function AdminSchedule({ schedule, users, settings }) {
       setError(`No hay tareas activas para duplicar del ${day}.`);
       return;
     }
-    const replaceText = duplicateReplace ? ' Se reemplazará el horario activo que ya exista en esos días.' : '';
-    const ok = window.confirm(`¿Duplicar ${sourceItems.length} tarea(s) del ${day} a ${targets.join(', ')}?${replaceText}`);
+    const scenarioName = scenarios.find(item => normalizeKey(item.id) === normalizeKey(duplicateScenario))?.name || duplicateScenario;
+    const scenarioText = sameScenario ? '' : ` al escenario "${scenarioName}"`;
+    const replaceText = duplicateReplace ? ' Se reemplazará el horario que ya exista en esos días.' : '';
+    const ok = window.confirm(`¿Duplicar ${sourceItems.length} tarea(s) del ${day} a ${targets.join(', ')}${scenarioText}?${replaceText}`);
     if (!ok) return;
 
     setDuplicating(true);
@@ -423,9 +435,10 @@ export default function AdminSchedule({ schedule, users, settings }) {
     try {
       const count = await duplicateScheduleDay(sourceItems, targets, {
         replaceExisting: duplicateReplace,
-        existingSchedule: schedule
+        existingSchedule: allSchedule || schedule,
+        targetScenario: duplicateScenario
       });
-      setNotice(`Se duplicaron ${count} tarea(s) del ${day} a ${targets.join(', ')}.`);
+      setNotice(`Se duplicaron ${count} tarea(s) del ${day} a ${targets.join(', ')}${scenarioText}.`);
       setDuplicateOpen(false);
       setDuplicateDays([]);
     } catch (err) {
@@ -623,22 +636,37 @@ export default function AdminSchedule({ schedule, users, settings }) {
       {duplicateOpen && (
         <div className="coverage-panel">
           <h3>Duplicar horario del {day}</h3>
+          <div className="shift-controls">
+            <label>
+              <span>Escenario destino</span>
+              <select value={duplicateScenario} onChange={e => setDuplicateScenario(e.target.value)}>
+                {scenarios.map(item => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}{normalizeKey(item.id) === normalizeKey(activeScenario) ? ' (activo)' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
           <div className="shift-days">
             <span className="muted">Copiar a:</span>
-            {DAYS.slice(0, 6).filter(name => name !== day).map(name => (
-              <label key={name} className="day-check">
-                <input
-                  type="checkbox"
-                  checked={duplicateDays.includes(name)}
-                  onChange={() => toggleDuplicateDay(name)}
-                />
-                <span>{name}</span>
-              </label>
-            ))}
+            {DAYS.slice(0, 6)
+              .filter(name => normalizeKey(duplicateScenario) !== normalizeKey(activeScenario) || name !== day)
+              .map(name => (
+                <label key={name} className="day-check">
+                  <input
+                    type="checkbox"
+                    checked={duplicateDays.includes(name)}
+                    onChange={() => toggleDuplicateDay(name)}
+                  />
+                  <span>{name}</span>
+                </label>
+              ))}
             <button
               type="button"
               className="btn ghost small"
-              onClick={() => setDuplicateDays(DAYS.slice(0, 6).filter(name => name !== day))}
+              onClick={() => setDuplicateDays(DAYS.slice(0, 6)
+                .filter(name => normalizeKey(duplicateScenario) !== normalizeKey(activeScenario) || name !== day))}
             >
               Todos
             </button>
@@ -656,7 +684,7 @@ export default function AdminSchedule({ schedule, users, settings }) {
               {duplicating ? 'Duplicando...' : 'Duplicar horario'}
             </button>
           </div>
-          <p className="muted">Copia las mismas tareas, asistentes y horas del día seleccionado al escenario activo.</p>
+          <p className="muted">Copia las mismas tareas, asistentes y horas del día seleccionado al escenario destino. Puedes duplicar a otro escenario (incluso el mismo día) para armarlo a partir del actual.</p>
         </div>
       )}
 

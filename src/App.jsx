@@ -291,7 +291,7 @@ export default function App() {
 
           {activeView === 'tools' && <ButtonGrid buttons={visibleButtons} search={search} />}
           {activeView === 'my-schedule' && <AssistantSchedule schedule={scenarioSchedule} user={effectiveProfile} settings={managerSettings} />}
-          {activeView === 'admin-schedule' && effectiveIsAdmin && <AdminSchedule schedule={scenarioSchedule} users={users} settings={managerSettings} />}
+          {activeView === 'admin-schedule' && effectiveIsAdmin && <AdminSchedule schedule={scenarioSchedule} allSchedule={schedule} users={users} settings={managerSettings} />}
           {activeView === 'certificates' && canManageCertificates && (
             <CertificatesManager certificates={certificates} currentUserName={currentUserName} canManage={canManageCertificates} />
           )}
