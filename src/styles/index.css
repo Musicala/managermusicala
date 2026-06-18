@@ -213,6 +213,13 @@ input:focus, select:focus, textarea:focus { border-color: var(--vivaldi); backgr
 .checkbox-label input, .switch-label input { width: auto; }
 
 .users-list, .button-edit-list { gap: 14px; padding: 18px 22px 22px; }
+.button-search-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 0 22px 4px; }
+.button-search-bar select { width: auto; min-width: 180px; }
+.button-search-bar .muted { margin-left: auto; font-size: 12px; }
+.button-search-input { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 220px; background: #f9f9fb; border: 1.5px solid var(--line); border-radius: 12px; padding-left: 12px; text-transform: none; letter-spacing: 0; color: var(--muted); }
+.button-search-input input { border: 0; background: transparent; padding: 11px 12px 11px 0; box-shadow: none; }
+.button-search-input input:focus { box-shadow: none; background: transparent; }
+.button-search-input:focus-within { border-color: var(--vivaldi); background: #fff; box-shadow: 0 0 0 3px rgba(87,41,255,.11); }
 .user-card, .button-editor, .preview-panel { border: 1.5px solid var(--line); background: #fff; border-radius: 16px; padding: 16px; display: grid; gap: 14px; }
 .user-main { justify-content: space-between; align-items: flex-start; }
 .inline-title { border: 0; background: transparent; padding: 0; font-size: 1.05rem; font-weight: 800; }

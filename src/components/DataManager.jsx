@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus, Save, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Plus, Save, Search, Trash2 } from 'lucide-react';
 import { deleteButton, saveButton } from '../services/buttonsService';
 import { normalizeButtonSection, normalizeButtonSections } from '../utils/normalize';
 
@@ -21,7 +21,21 @@ export default function DataManager({ buttons, settings = {} }) {
   const [newButton, setNewButton] = useState(EMPTY_BUTTON);
   const [message, setMessage] = useState('');
   const [savingId, setSavingId] = useState('');
+  const [query, setQuery] = useState('');
+  const [sectionFilter, setSectionFilter] = useState('');
   const sectionOptions = normalizeButtonSections(settings.buttonSections);
+
+  // Lista ordenada alfabéticamente y filtrada por texto/sección para encontrar
+  // botones cuando ya hay muchos.
+  const visibleButtons = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    return [...buttons]
+      .filter(button => !sectionFilter
+        || normalizeButtonSection(button.section, sectionOptions) === sectionFilter)
+      .filter(button => !term
+        || `${button.name || ''} ${button.url || ''}`.toLowerCase().includes(term))
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'es', { sensitivity: 'base' }));
+  }, [buttons, query, sectionFilter, sectionOptions]);
 
   function getDraft(button) {
     return drafts[button.id] || { ...button };
@@ -85,6 +99,25 @@ export default function DataManager({ buttons, settings = {} }) {
 
       {message && <div className="info-banner">{message}</div>}
 
+      <div className="button-search-bar">
+        <label className="button-search-input">
+          <Search size={16} />
+          <input
+            type="search"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Buscar botón por nombre o URL..."
+          />
+        </label>
+        <select value={sectionFilter} onChange={e => setSectionFilter(e.target.value)}>
+          <option value="">Todas las secciones</option>
+          {sectionOptions.map(section => (
+            <option key={section} value={section}>{section}</option>
+          ))}
+        </select>
+        <span className="muted">{visibleButtons.length} de {buttons.length}</span>
+      </div>
+
       {creating && (
         <form className="button-editor new" onSubmit={saveNew}>
           <ButtonFields value={newButton} sectionOptions={sectionOptions} onChange={(field, value) => setNewButton(current => ({ ...current, [field]: value }))} />
@@ -96,7 +129,10 @@ export default function DataManager({ buttons, settings = {} }) {
       )}
 
       <div className="button-edit-list">
-        {buttons.map(button => {
+        {!visibleButtons.length && (
+          <p className="muted padded">No hay botones que coincidan con la búsqueda.</p>
+        )}
+        {visibleButtons.map(button => {
           const draft = getDraft(button);
           return (
             <article className="button-editor" key={button.id}>
