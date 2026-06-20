@@ -120,7 +120,9 @@ export default function ManagerSettings({ users = [] }) {
 
   function updateButtonSection(index, value) {
     setSettings(current => {
-      const sections = normalizeButtonSections(current.buttonSections);
+      const sections = Array.isArray(current.buttonSections)
+        ? [...current.buttonSections]
+        : normalizeButtonSections(current.buttonSections);
       sections[index] = value;
       return { ...current, buttonSections: sections };
     });
@@ -129,15 +131,22 @@ export default function ManagerSettings({ users = [] }) {
   function addButtonSection() {
     setSettings(current => ({
       ...current,
-      buttonSections: [...normalizeButtonSections(current.buttonSections), 'Nueva sección']
+      buttonSections: [
+        ...(Array.isArray(current.buttonSections)
+          ? current.buttonSections
+          : normalizeButtonSections(current.buttonSections)),
+        'Nueva sección'
+      ]
     }));
   }
 
   function removeButtonSection(index) {
     setSettings(current => {
-      const sections = normalizeButtonSections(current.buttonSections)
-        .filter((_, itemIndex) => itemIndex !== index);
-      return { ...current, buttonSections: normalizeButtonSections(sections) };
+      const source = Array.isArray(current.buttonSections)
+        ? current.buttonSections
+        : normalizeButtonSections(current.buttonSections);
+      const sections = source.filter((_, itemIndex) => itemIndex !== index);
+      return { ...current, buttonSections: sections };
     });
   }
 
@@ -395,8 +404,11 @@ export default function ManagerSettings({ users = [] }) {
         </div>
         <div className="settings-body">
           <div className="notification-message-list">
-            {normalizeButtonSections(settings.buttonSections).map((section, index) => (
-              <div className="notification-message-row button-section-row" key={`${section}-${index}`}>
+            {(Array.isArray(settings.buttonSections)
+              ? settings.buttonSections
+              : normalizeButtonSections(settings.buttonSections)
+            ).map((section, index) => (
+              <div className="notification-message-row button-section-row" key={index}>
                 <label>
                   <span>Nombre de sección</span>
                   <input
@@ -410,7 +422,10 @@ export default function ManagerSettings({ users = [] }) {
                     className="btn danger"
                     type="button"
                     onClick={() => removeButtonSection(index)}
-                    disabled={normalizeButtonSections(settings.buttonSections).length <= 1}
+                    disabled={(Array.isArray(settings.buttonSections)
+                      ? settings.buttonSections
+                      : normalizeButtonSections(settings.buttonSections)
+                    ).length <= 1}
                   >
                     <Trash2 size={16} /> Eliminar
                   </button>
