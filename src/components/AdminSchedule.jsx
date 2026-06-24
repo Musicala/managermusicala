@@ -365,16 +365,58 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
     let repeatIndex = 0;
     let adjustedCount = 0;
 
+    const ruleOf = name => ruleByTask[normalizeKey(name)];
     for (const assistant of assistants) {
       const info = hubInfoByAssistant[normalizeKey(assistant.email || assistant.name)];
       if (!info?.jornada || !info.gaps.length) continue;
-      const pendingQueue = taskTemplates
+
+      // Segmentos libres mutables: se van consumiendo a medida que ubicamos tareas.
+      let segments = info.gaps.map(([s, e]) => ({ start: s, end: e }));
+      const dropTiny = () => { segments = segments.filter(seg => seg.end - seg.start >= 15); };
+
+      const place = (template, startMinutes, durationMinutes) => {
+        placements.push({ assistant, startMinutes, endMinutes: startMinutes + durationMinutes, template });
+        assignedKeys.add(`${normalizeKey(template.name)}::${assistantKey(assistant)}`);
+      };
+
+      // Tarea de apertura: lo más temprano posible (primer segmento que la admita).
+      const placeFront = template => {
+        const duration = Number(template.durationMinutes || 30);
+        const seg = [...segments].sort((a, b) => a.start - b.start).find(s => s.end - s.start >= duration);
+        if (!seg) return;
+        place(template, seg.start, duration);
+        seg.start += duration;
+        dropTiny();
+      };
+
+      // Tarea de cierre: lo más tarde posible (último segmento que la admita).
+      const placeBack = template => {
+        const duration = Number(template.durationMinutes || 30);
+        const seg = [...segments].sort((a, b) => b.end - a.end).find(s => s.end - s.start >= duration);
+        if (!seg) return;
+        place(template, seg.end - duration, duration);
+        seg.end -= duration;
+        dropTiny();
+      };
+
+      const pending = taskTemplates
         .filter(template => templateAppliesToAssistant(template, assistant))
         .filter(template => !isAssignedToAssistant(template, assistant))
         .sort((a, b) => (prioRank[a.priority] ?? 1) - (prioRank[b.priority] ?? 1));
+
+      // 1) Apertura primero (temprano), 2) cierre (tarde), antes de rellenar el resto.
+      pending.filter(t => ruleOf(t.name)?.rule === 'inicio').forEach(placeFront);
+      pending.filter(t => ruleOf(t.name)?.rule === 'fin').forEach(placeBack);
+
+      // 3) Resto de tareas (sin regla) por prioridad, luego repetibles, en lo que quede libre.
+      const pendingQueue = pending.filter(t => {
+        const rule = ruleOf(t.name)?.rule;
+        return rule !== 'inicio' && rule !== 'fin';
+      });
       const assistantRepeatables = repeatables.filter(template => templateAppliesToAssistant(template, assistant));
-      for (const [gapStart, gapEnd] of info.gaps) {
-        let cursor = gapStart;
+      for (const seg of [...segments].sort((a, b) => a.start - b.start)) {
+        let cursor = seg.start;
+        const gapEnd = seg.end;
         while (gapEnd - cursor >= 15) {
           const remaining = gapEnd - cursor;
           let chosen = null;
@@ -423,8 +465,7 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
           }
 
           if (!chosen) break;
-          placements.push({ assistant, startMinutes: cursor, endMinutes: cursor + placedDuration, template: chosen });
-          assignedKeys.add(`${normalizeKey(chosen.name)}::${assistantKey(assistant)}`);
+          place(chosen, cursor, placedDuration);
           cursor += placedDuration;
         }
       }
