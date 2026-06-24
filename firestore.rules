@@ -202,6 +202,12 @@ service cloud.firestore {
         allow read: if isManagerActiveAdmin() || isManagerSharedAssistantEmail();
         allow write, delete: if isManagerActiveAdmin();
       }
+
+      // Candados (MusiLockers): todo el equipo activo ve; admin y asistentes gestionan.
+      match /lockers/{lockerId} {
+        allow read: if isManagerActiveUser();
+        allow create, update, delete: if isManagerCertificateManager();
+      }
     }
 
     // Todo lo demas, denegado.

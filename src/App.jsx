@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CalendarDays, Download, Eye, FileCheck2, Grid3X3, LogOut, Search, Settings, Users, X } from 'lucide-react';
+import { AlertTriangle, CalendarDays, Download, Eye, FileCheck2, Grid3X3, Lock, LogOut, Search, Settings, Users, X } from 'lucide-react';
 import { firebaseReady } from './firebase/firebase';
 import { ensureCurrentUserProfile, listenAuth, logout } from './services/authService';
 import { SHARED_ASSISTANT_EMAIL } from './services/authService';
@@ -8,6 +8,7 @@ import { listenButtons } from './services/buttonsService';
 import { listenSchedule } from './services/scheduleService';
 import { listenUsers } from './services/usersService';
 import { listenCertificates } from './services/certificatesService';
+import { listenLockers } from './services/lockersService';
 import { DEFAULT_MANAGER_SETTINGS, listenManagerSettings } from './services/managerConfigService';
 import { ROLES, getInitials, normalizeKey, normalizeText } from './utils/normalize';
 import { assetUrl } from './utils/assets';
@@ -21,12 +22,14 @@ import UsersAdmin from './components/UsersAdmin';
 import DataManager from './components/DataManager';
 import ManagerSettings from './components/ManagerSettings';
 import CertificatesManager from './components/CertificatesManager';
+import LockersManager from './components/LockersManager';
 
 const NAV_ITEMS = [
   { id: 'tools', label: 'Herramientas', icon: Grid3X3, roles: ['*'] },
   { id: 'my-schedule', label: 'Mi horario', icon: CalendarDays, roles: ['asistente'] },
   { id: 'admin-schedule', label: 'Gestionar horario', icon: CalendarDays, roles: ['admin'] },
   { id: 'certificates', label: 'Certificados', icon: FileCheck2, roles: ['admin', 'asistente'] },
+  { id: 'lockers', label: 'MusiLockers', icon: Lock, roles: ['admin', 'asistente'] },
   { id: 'data', label: 'Botones', icon: Download, roles: ['admin'] },
   { id: 'users', label: 'Usuarios', icon: Users, roles: ['admin'] },
   { id: 'settings', label: 'Configuracion', icon: Settings, roles: ['admin'] }
@@ -42,6 +45,7 @@ export default function App() {
   const [schedule, setSchedule] = useState([]);
   const [users, setUsers] = useState([]);
   const [certificates, setCertificates] = useState([]);
+  const [lockers, setLockers] = useState([]);
   const [activeView, setActiveView] = useState('tools');
   const [search, setSearch] = useState('');
   const [managerSettings, setManagerSettings] = useState(DEFAULT_MANAGER_SETTINGS);
@@ -99,12 +103,14 @@ export default function App() {
     const unsubSchedule = listenSchedule(setSchedule);
     const unsubUsers = isAdmin ? listenUsers(setUsers) : () => {};
     const unsubCertificates = listenCertificates(setCertificates);
+    const unsubLockers = listenLockers(setLockers);
     const unsubSettings = listenManagerSettings(setManagerSettings);
     return () => {
       unsubButtons();
       unsubSchedule();
       unsubUsers();
       unsubCertificates();
+      unsubLockers();
       unsubSettings();
     };
   }, [isActive, isAdmin]);
@@ -295,6 +301,9 @@ export default function App() {
           {activeView === 'certificates' && canManageCertificates && (
             <CertificatesManager certificates={certificates} currentUserName={currentUserName} canManage={canManageCertificates} />
           )}
+          {activeView === 'lockers' && canManageCertificates && (
+            <LockersManager lockers={lockers} currentUserName={currentUserName} canManage={canManageCertificates} />
+          )}
           {activeView === 'data' && effectiveIsAdmin && <DataManager buttons={buttons} settings={managerSettings} />}
           {activeView === 'users' && effectiveIsAdmin && <UsersAdmin users={users} buttons={buttons} />}
           {activeView === 'settings' && effectiveIsAdmin && <ManagerSettings users={users} />}
@@ -310,6 +319,7 @@ function getViewTitle(view) {
     'my-schedule': 'Mi horario',
     'admin-schedule': 'Gestion de horario',
     certificates: 'Certificados',
+    lockers: 'MusiLockers',
     data: 'Gestion de botones',
     users: 'Usuarios y accesos',
     settings: 'Configuracion'
