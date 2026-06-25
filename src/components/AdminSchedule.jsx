@@ -85,7 +85,7 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
       .filter(user => user.role === 'asistente')
       .map(user => ({
         name: user.displayName || user.username || user.email,
-        email: user.source === 'assistantAccount' ? '' : user.email,
+        email: user.email || '',
         username: user.username || user.legacyUsername || '',
         source: user.source,
         lunchStart: user.lunchStart || '',

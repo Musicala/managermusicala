@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bell, Plus, Save, Trash2, UserPlus, Volume2 } from 'lucide-react';
-import { deleteAssistantAccount, listenAssistantAccounts, saveAssistantAccount } from '../services/assistantAccountsService';
-import { BUTTON_SECTION_OPTIONS, normalizeButtonSections } from '../utils/normalize';
+import { deleteAssistantInvite, listenAssistantInvites, saveAssistantInvite } from '../services/assistantAccountsService';
+import { AREA_LABELS, AREAS, BUTTON_SECTION_OPTIONS, normalizeButtonSections } from '../utils/normalize';
 import {
   DEFAULT_MANAGER_SETTINGS,
   listenManagerSettings,
@@ -28,9 +28,9 @@ const EMPTY_TEMPLATE = {
 };
 
 const EMPTY_ASSISTANT = {
-  username: '',
+  email: '',
   displayName: '',
-  password: '',
+  area: AREAS.ADMIN,
   lunchStart: '',
   lunchMinutes: 60,
   active: true
@@ -54,7 +54,7 @@ const SOUND_PROFILE_LABELS = {
 export default function ManagerSettings({ users = [] }) {
   const [settings, setSettings] = useState(DEFAULT_MANAGER_SETTINGS);
   const [templates, setTemplates] = useState([]);
-  const [assistantAccounts, setAssistantAccounts] = useState([]);
+  const [assistantInvites, setAssistantInvites] = useState([]);
   const [template, setTemplate] = useState(EMPTY_TEMPLATE);
   const [assistantDraft, setAssistantDraft] = useState(EMPTY_ASSISTANT);
   const [message, setMessage] = useState('');
@@ -63,7 +63,7 @@ export default function ManagerSettings({ users = [] }) {
   useEffect(() => {
     const unsubSettings = listenManagerSettings(setSettings);
     const unsubTemplates = listenTaskTemplates(setTemplates);
-    const unsubAssistants = listenAssistantAccounts(setAssistantAccounts);
+    const unsubAssistants = listenAssistantInvites(setAssistantInvites);
     return () => {
       unsubSettings();
       unsubTemplates();
@@ -250,9 +250,9 @@ export default function ManagerSettings({ users = [] }) {
     setSaving(true);
     setMessage('');
     try {
-      await saveAssistantAccount(assistantDraft);
+      await saveAssistantInvite(assistantDraft);
       setAssistantDraft(EMPTY_ASSISTANT);
-      setMessage('Usuario de asistente guardado.');
+      setMessage('Asistente guardada. Cuando entre con ese correo, accede directo.');
     } catch (error) {
       setMessage(error.message || 'No se pudo guardar la asistente.');
     } finally {
@@ -261,13 +261,13 @@ export default function ManagerSettings({ users = [] }) {
   }
 
   async function removeAssistant(account) {
-    const ok = window.confirm(`Eliminar el usuario interno "${account.displayName || account.username}"?`);
+    const ok = window.confirm(`Eliminar el acceso de "${account.displayName || account.email}"?`);
     if (!ok) return;
     setSaving(true);
     setMessage('');
     try {
-      await deleteAssistantAccount(account.id);
-      setMessage('Usuario interno eliminado.');
+      await deleteAssistantInvite(account.email || account.id);
+      setMessage('Acceso de asistente eliminado.');
     } catch (error) {
       setMessage(error.message || 'No se pudo eliminar.');
     } finally {
@@ -495,23 +495,31 @@ export default function ManagerSettings({ users = [] }) {
         <div className="module-header">
           <div>
             <p className="eyebrow">Asistentes</p>
-            <h2>Usuarios internos del correo compartido</h2>
+            <h2>Accesos por correo</h2>
           </div>
-          <span className="pill">{assistantAccounts.length}</span>
+          <span className="pill">{assistantInvites.length}</span>
         </div>
         <form className="settings-body" onSubmit={saveAssistant}>
+          <p className="muted">
+            Registra el correo de cada asistente. Cuando inicie sesión con ese correo,
+            entra directo con su rol; no necesita la segunda ventana.
+          </p>
           <div className="form-grid assistant-account-fields">
             <label>
-              <span>Usuario</span>
-              <input value={assistantDraft.username} onChange={e => setAssistantDraft(current => ({ ...current, username: e.target.value }))} placeholder="angie" />
+              <span>Correo</span>
+              <input type="email" value={assistantDraft.email} onChange={e => setAssistantDraft(current => ({ ...current, email: e.target.value }))} placeholder="asistente@gmail.com" />
             </label>
             <label>
               <span>Nombre visible</span>
-              <input value={assistantDraft.displayName} onChange={e => setAssistantDraft(current => ({ ...current, displayName: e.target.value }))} placeholder="Angie Nitola" />
+              <input value={assistantDraft.displayName} onChange={e => setAssistantDraft(current => ({ ...current, displayName: e.target.value }))} placeholder="Camila Rodríguez" />
             </label>
             <label>
-              <span>Contraseña</span>
-              <input value={assistantDraft.password} onChange={e => setAssistantDraft(current => ({ ...current, password: e.target.value }))} placeholder="Clave interna" />
+              <span>Área / rol</span>
+              <select value={assistantDraft.area || AREAS.ADMIN} onChange={e => setAssistantDraft(current => ({ ...current, area: e.target.value }))}>
+                {Object.entries(AREA_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
             </label>
             <label>
               <span>Hora de almuerzo</span>
@@ -527,25 +535,28 @@ export default function ManagerSettings({ users = [] }) {
             </label>
           </div>
           <div className="right-actions">
+            {assistantDraft.id && (
+              <button type="button" className="btn ghost" onClick={() => setAssistantDraft(EMPTY_ASSISTANT)}>Cancelar</button>
+            )}
             <button className="btn primary" disabled={saving}><UserPlus size={17} /> Guardar asistente</button>
           </div>
         </form>
         <div className="task-template-list">
-          {assistantAccounts.map(account => (
+          {assistantInvites.map(account => (
             <div className="task-template assistant-account-row" key={account.id}>
               <div>
-                <strong>{account.displayName || account.username}</strong>
+                <strong>{account.displayName || account.email}</strong>
                 <span>
-                  {account.username} · {account.active === false ? 'Inactivo' : 'Activo'}
+                  {account.email} · {AREA_LABELS[account.area] || 'Asistente'} · {account.active === false ? 'Inactivo' : 'Activo'}
                   {account.lunchStart ? ` · 🍽 almuerzo ${account.lunchStart} (${account.lunchMinutes || 60} min)` : ''}
                 </span>
               </div>
               <div className="right-actions">
                 <button className="btn ghost" onClick={() => setAssistantDraft({
                   id: account.id,
-                  username: account.username || '',
+                  email: account.email || account.id || '',
                   displayName: account.displayName || '',
-                  password: account.password || '',
+                  area: account.area || AREAS.ADMIN,
                   lunchStart: account.lunchStart || '',
                   lunchMinutes: account.lunchMinutes ?? 60,
                   active: account.active !== false
@@ -554,7 +565,7 @@ export default function ManagerSettings({ users = [] }) {
               </div>
             </div>
           ))}
-          {!assistantAccounts.length && <p className="muted padded">Todavia no hay usuarios internos de asistentes.</p>}
+          {!assistantInvites.length && <p className="muted padded">Todavía no hay asistentes registradas por correo.</p>}
         </div>
       </section>
 

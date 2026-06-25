@@ -9,79 +9,51 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { appCollection, appDoc } from '../firebase/dbPaths';
-import { emailKey, normalizeButtonAccess, normalizeRole, normalizeText } from '../utils/normalize';
+import { emailKey, normalizeArea, normalizeButtonAccess, normalizeRole, normalizeText } from '../utils/normalize';
 
 export function listenUsers(callback) {
   if (!db) return () => {};
-  const state = { users: [], invites: [], legacy: [], assistantAccounts: [] };
-  const syncedAssistantAccountAccess = new Set();
+  const state = { users: [], invites: [], legacy: [], assistantInvites: [] };
 
   const emit = () => {
     const merged = new Map();
 
-    state.assistantAccounts.forEach(account => {
-      const accountKeys = [
-        normalizeText(account.username).toLowerCase(),
-        normalizeText(account.displayName).toLowerCase()
-      ].filter(Boolean);
-      const permissions = state.legacy.find(row => {
-        const rowKeys = [
-          normalizeText(row.username || row.legacyUsername).toLowerCase(),
-          normalizeText(row.displayName).toLowerCase(),
-          normalizeText(row.assistantName).toLowerCase()
-        ].filter(Boolean);
-        return rowKeys.some(key => accountKeys.includes(key));
-      });
-      const legacyAccess = Array.isArray(permissions?.buttonAccess) ? permissions.buttonAccess : [];
-      const accountAccess = Array.isArray(account.buttonAccess) ? account.buttonAccess : [];
-      if (legacyAccess.length && !accountAccess.length && !syncedAssistantAccountAccess.has(account.id)) {
-        syncedAssistantAccountAccess.add(account.id);
-        setDoc(appDoc(db, 'assistantAccounts', account.id), {
-          buttonAccess: legacyAccess,
-          updatedAt: serverTimestamp()
-        }, { merge: true }).catch(() => {
-          syncedAssistantAccountAccess.delete(account.id);
-        });
-      }
-
-      merged.set(`assistantAccount:${account.id}`, {
-        ...permissions,
-        ...account,
-        buttonAccess: accountAccess.length ? accountAccess : legacyAccess,
-        id: account.id,
-        source: 'assistantAccount',
+    // Directorio de asistentes por correo (aun sin cuenta Google creada).
+    state.assistantInvites.forEach(invite => {
+      const email = normalizeText(invite.email || invite.id).toLowerCase();
+      merged.set(`assistantInvite:${email}`, {
+        ...invite,
+        id: invite.id,
+        email,
+        source: 'assistantInvite',
         hasAuthProfile: false,
         role: 'asistente',
-        active: account.active !== false,
-        email: 'musicalaasesor@gmail.com',
-        displayName: account.displayName || account.username
+        area: normalizeArea(invite.area),
+        active: invite.active !== false,
+        buttonAccess: Array.isArray(invite.buttonAccess) ? invite.buttonAccess : [],
+        displayName: invite.displayName || email
       });
     });
 
     state.invites.forEach(item => merged.set(`invite:${item.id}`, item));
-    state.legacy.forEach(item => {
-      const alreadyCovered = state.assistantAccounts.some(account => {
-        const accountKeys = [
-          normalizeText(account.username).toLowerCase(),
-          normalizeText(account.displayName).toLowerCase()
-        ].filter(Boolean);
-        const rowKeys = [
-          normalizeText(item.username || item.legacyUsername).toLowerCase(),
-          normalizeText(item.displayName).toLowerCase(),
-          normalizeText(item.assistantName).toLowerCase()
-        ].filter(Boolean);
-        return rowKeys.some(key => accountKeys.includes(key));
-      });
-      if (!alreadyCovered) merged.set(`legacy:${item.id}`, item);
-    });
+    state.legacy.forEach(item => merged.set(`legacy:${item.id}`, item));
 
     state.users.forEach(item => {
       const email = normalizeText(item.email).toLowerCase();
       const invite = email ? state.invites.find(row => normalizeText(row.email).toLowerCase() === email) : null;
       if (invite) merged.delete(`invite:${invite.id}`);
+      // Si ya existe la cuenta Google, reemplaza la invitacion del directorio
+      // pero conserva el almuerzo/area configurados ahi.
+      const assistantInvite = email ? state.assistantInvites.find(row => normalizeText(row.email || row.id).toLowerCase() === email) : null;
+      if (assistantInvite) merged.delete(`assistantInvite:${email}`);
       merged.set(`user:${item.id}`, {
         ...invite,
         ...item,
+        ...(assistantInvite ? {
+          area: normalizeArea(item.area || assistantInvite.area),
+          lunchStart: item.lunchStart || assistantInvite.lunchStart || '',
+          lunchMinutes: Number(item.lunchMinutes) || Number(assistantInvite.lunchMinutes) || 60
+        } : {}),
         source: 'user',
         hasAuthProfile: true
       });
@@ -109,8 +81,8 @@ export function listenUsers(callback) {
     emit();
   });
 
-  const unsubAssistantAccounts = onSnapshot(appCollection(db, 'assistantAccounts'), snap => {
-    state.assistantAccounts = snap.docs.map(d => ({ id: d.id, source: 'assistantAccount', hasAuthProfile: false, ...d.data() }));
+  const unsubAssistantInvites = onSnapshot(appCollection(db, 'assistantInvites'), snap => {
+    state.assistantInvites = snap.docs.map(d => ({ id: d.id, email: d.id, source: 'assistantInvite', hasAuthProfile: false, ...d.data() }));
     emit();
   });
 
@@ -118,7 +90,7 @@ export function listenUsers(callback) {
     unsubUsers();
     unsubInvites();
     unsubLegacy();
-    unsubAssistantAccounts();
+    unsubAssistantInvites();
   };
 }
 
@@ -155,16 +127,18 @@ export async function updateUserProfile(userId, changes) {
     return;
   }
 
-  if (changes.source === 'assistantAccount') {
-    await setDoc(appDoc(db, 'assistantAccounts', userId), {
-      ...payload,
-      displayName: normalizeText(changes.displayName),
-      username: normalizeText(changes.username || changes.displayName).toLowerCase(),
-      role: 'asistente'
-    }, { merge: true });
+  if (changes.source === 'assistantInvite') {
+    const id = normalizeText(changes.email || userId).toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(changes, 'area')) {
+      payload.area = normalizeArea(changes.area);
+    }
+    await setDoc(appDoc(db, 'assistantInvites', id), payload, { merge: true });
     return;
   }
 
+  if (Object.prototype.hasOwnProperty.call(changes, 'area')) {
+    payload.area = normalizeArea(changes.area);
+  }
   await updateDoc(appDoc(db, 'users', userId), payload);
 }
 
@@ -182,8 +156,9 @@ export async function deleteUserProfile(user) {
     return;
   }
 
-  if (user.source === 'assistantAccount') {
-    await deleteDoc(appDoc(db, 'assistantAccounts', user.id));
+  if (user.source === 'assistantInvite') {
+    const id = normalizeText(user.email || user.id).toLowerCase();
+    await deleteDoc(appDoc(db, 'assistantInvites', id));
     return;
   }
 

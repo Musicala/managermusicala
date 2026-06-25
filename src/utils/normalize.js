@@ -7,10 +7,29 @@ export const ROLES = {
 export const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
 export const ROLE_LABELS = {
-  admin: 'Administrador',
+  admin: 'Dirección',
   asistente: 'Asistente',
   docente: 'Docente'
 };
+
+// Areas de las asistentes. Funcionalmente todas son rol "asistente";
+// el area solo cambia la etiqueta/titulo que se muestra.
+export const AREAS = {
+  ADMIN: 'admin',
+  COMERCIAL: 'comercial'
+};
+
+export const AREA_LABELS = {
+  admin: 'Asistente administrativa',
+  comercial: 'Asistente comercial'
+};
+
+export function normalizeArea(value) {
+  const key = normalizeKey(value);
+  if (key.includes('comercial') || key.includes('venta')) return AREAS.COMERCIAL;
+  if (key.includes('admin')) return AREAS.ADMIN;
+  return key === AREAS.COMERCIAL ? AREAS.COMERCIAL : AREAS.ADMIN;
+}
 
 export const BUTTON_SECTION_OPTIONS = [
   'Académico',

@@ -1,98 +1,54 @@
-import { deleteDoc, getDocs, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
+import { deleteDoc, getDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { appCollection, appDoc } from '../firebase/dbPaths';
-import { normalizeText, slugify } from '../utils/normalize';
+import { normalizeArea, normalizeText } from '../utils/normalize';
 import { normalizeTime } from '../utils/time';
 
-export function listenAssistantAccounts(callback) {
+// Directorio de asistentes por correo. El id del documento es el correo
+// (en minusculas), para que cada persona pueda leer su propia invitacion
+// al iniciar sesion y entrar directo, sin la segunda ventana.
+
+export function inviteEmailKey(email) {
+  return normalizeText(email).toLowerCase();
+}
+
+export function listenAssistantInvites(callback) {
   if (!db) return () => {};
-  return onSnapshot(appCollection(db, 'assistantAccounts'), snap => {
-    const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    rows.sort((a, b) => String(a.displayName || a.username || '').localeCompare(String(b.displayName || b.username || ''), 'es'));
+  return onSnapshot(appCollection(db, 'assistantInvites'), snap => {
+    const rows = snap.docs.map(d => ({ id: d.id, email: d.id, ...d.data() }));
+    rows.sort((a, b) => String(a.displayName || a.email || '').localeCompare(String(b.displayName || b.email || ''), 'es'));
     callback(rows);
   });
 }
 
-export async function saveAssistantAccount(account) {
+export async function getAssistantInvite(email) {
+  if (!db) return null;
+  const key = inviteEmailKey(email);
+  if (!key) return null;
+  const snap = await getDoc(appDoc(db, 'assistantInvites', key));
+  return snap.exists() ? { id: snap.id, email: snap.id, ...snap.data() } : null;
+}
+
+export async function saveAssistantInvite(invite) {
   if (!db) throw new Error('Firebase no esta disponible.');
-  const username = normalizeText(account.username).toLowerCase();
-  const id = account.id || slugify(username || account.displayName);
-  if (!username) throw new Error('El usuario necesita nombre de usuario.');
-  if (!normalizeText(account.password)) throw new Error('El usuario necesita contraseña.');
-  await setDoc(appDoc(db, 'assistantAccounts', id), {
-    username,
-    displayName: normalizeText(account.displayName) || username,
-    password: normalizeText(account.password),
-    role: 'asistente',
-    lunchStart: normalizeTime(account.lunchStart) || '',
-    lunchMinutes: Number(account.lunchMinutes) || 60,
-    active: account.active !== false,
+  const email = inviteEmailKey(invite.email);
+  if (!email) throw new Error('El asistente necesita un correo.');
+  await setDoc(appDoc(db, 'assistantInvites', email), {
+    displayName: normalizeText(invite.displayName) || email,
+    area: normalizeArea(invite.area),
+    buttonAccess: Array.isArray(invite.buttonAccess) ? invite.buttonAccess : [],
+    lunchStart: normalizeTime(invite.lunchStart) || '',
+    lunchMinutes: Number(invite.lunchMinutes) || 60,
+    active: invite.active !== false,
     updatedAt: serverTimestamp(),
-    createdAt: account.createdAt || serverTimestamp()
+    createdAt: invite.createdAt || serverTimestamp()
   }, { merge: true });
-  return id;
+  return email;
 }
 
-export async function deleteAssistantAccount(accountId) {
-  if (!db || !accountId) throw new Error('Falta el usuario.');
-  await deleteDoc(appDoc(db, 'assistantAccounts', accountId));
-}
-
-export function buildAssistantProfile(account, authUser) {
-  return {
-    id: `assistant:${account.id}`,
-    uid: `${authUser.uid}:${account.id}`,
-    email: authUser.email,
-    displayName: account.displayName || account.username,
-    assistantName: account.displayName || account.username,
-    assistantUsername: account.username,
-    role: 'asistente',
-    active: true,
-    pending: false,
-    buttonAccess: Array.isArray(account.buttonAccess) ? account.buttonAccess : []
-  };
-}
-
-export async function resolveAssistantProfile(account, authUser, options = {}) {
-  const profile = buildAssistantProfile(account, authUser);
-  if (!db || options.skipRestrictedLookups) return profile;
-
-  let sources = [];
-  try {
-    sources = [
-      await getDocs(appCollection(db, 'userInvites')),
-      await getDocs(appCollection(db, 'legacyUsers')),
-      await getDocs(appCollection(db, 'users'))
-    ];
-  } catch (error) {
-    if (error?.code === 'permission-denied') return profile;
-    throw error;
-  }
-
-  const accountKeys = [
-    normalizeText(account.username).toLowerCase(),
-    normalizeText(account.displayName).toLowerCase()
-  ].filter(Boolean);
-
-  for (const snap of sources) {
-    const match = snap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
-      .find(row => {
-        const rowKeys = [
-          normalizeText(row.username || row.legacyUsername).toLowerCase(),
-          normalizeText(row.displayName).toLowerCase(),
-          normalizeText(row.assistantName).toLowerCase()
-        ].filter(Boolean);
-        return rowKeys.some(key => accountKeys.includes(key));
-      });
-
-    if (match) {
-      return {
-        ...profile,
-        buttonAccess: Array.isArray(match.buttonAccess) ? match.buttonAccess : profile.buttonAccess
-      };
-    }
-  }
-
-  return profile;
+export async function deleteAssistantInvite(email) {
+  if (!db) throw new Error('Firebase no esta disponible.');
+  const key = inviteEmailKey(email);
+  if (!key) throw new Error('Falta el correo.');
+  await deleteDoc(appDoc(db, 'assistantInvites', key));
 }

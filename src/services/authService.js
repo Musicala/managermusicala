@@ -13,14 +13,13 @@ import {
 import { auth, db, firebaseReady } from '../firebase/firebase';
 import { bootstrapAdminEmail } from '../firebase/config';
 import { appDoc } from '../firebase/dbPaths';
-import { normalizeText, ROLES } from '../utils/normalize';
+import { getAssistantInvite } from './assistantAccountsService';
+import { normalizeArea, normalizeText, ROLES } from '../utils/normalize';
 
 export const OFFICIAL_ADMIN_EMAILS = [
   'alekcaballeromusic@gmail.com',
   'catalina.medina.leal@gmail.com'
 ];
-
-export const SHARED_ASSISTANT_EMAIL = 'musicalaasesor@gmail.com';
 
 export function listenAuth(callback) {
   if (!firebaseReady || !auth) return () => {};
@@ -51,40 +50,64 @@ export async function ensureCurrentUserProfile(user) {
   const snap = await getDoc(ref);
   const email = normalizeText(user.email).toLowerCase();
   const isOfficialAdmin = OFFICIAL_ADMIN_EMAILS.includes(email) || email === bootstrapAdminEmail;
-  const isSharedAssistant = email === SHARED_ASSISTANT_EMAIL;
+
+  // Asistentes con correo propio: si su correo esta en el directorio
+  // (assistantInvites) y esta activo, entran directo como asistentes.
+  let invite = null;
+  if (!isOfficialAdmin) {
+    try {
+      invite = await getAssistantInvite(email);
+    } catch (error) {
+      if (error?.code !== 'permission-denied') throw error;
+    }
+  }
+  const isInvitedAssistant = Boolean(invite && invite.active !== false);
 
   if (snap.exists()) {
-    const changes = {
-      lastLoginAt: serverTimestamp(),
-      ...(isOfficialAdmin ? { role: ROLES.ADMIN, active: true, pending: false, buttonAccess: ['*'] } : {})
-    };
-    await updateDoc(ref, changes);
-    const existing = { id: snap.id, ...snap.data(), ...changes };
-    if (isSharedAssistant) {
-      return {
-        ...existing,
-        role: ROLES.ASISTENTE,
-        active: false,
-        pending: true,
-        sharedAssistantLogin: true
-      };
+    const data = snap.data();
+    const changes = { lastLoginAt: serverTimestamp() };
+
+    if (isOfficialAdmin) {
+      Object.assign(changes, { role: ROLES.ADMIN, active: true, pending: false, buttonAccess: ['*'] });
+    } else if (isInvitedAssistant) {
+      changes.role = ROLES.ASISTENTE;
+      changes.active = true;
+      changes.pending = false;
+      changes.area = normalizeArea(invite.area);
+      changes.displayName = normalizeText(invite.displayName) || data.displayName || email;
+      changes.lunchStart = invite.lunchStart || '';
+      changes.lunchMinutes = Number(invite.lunchMinutes) || 60;
+      // Los permisos de botones se siembran desde la invitacion solo si el
+      // perfil aun no tiene ninguno; luego se editan desde Usuarios.
+      if (!Array.isArray(data.buttonAccess) || data.buttonAccess.length === 0) {
+        changes.buttonAccess = Array.isArray(invite.buttonAccess) ? invite.buttonAccess : [];
+      }
     }
-    return existing;
+
+    await updateDoc(ref, changes);
+    return { id: snap.id, ...data, ...changes };
   }
 
   const profile = {
     uid: user.uid,
     email,
-    displayName: normalizeText(user.displayName) || email,
-    role: isOfficialAdmin ? ROLES.ADMIN : isSharedAssistant ? ROLES.ASISTENTE : ROLES.DOCENTE,
-    active: isOfficialAdmin,
-    pending: !isOfficialAdmin,
-    sharedAssistantLogin: isSharedAssistant,
-    buttonAccess: isOfficialAdmin ? ['*'] : [],
+    displayName: isInvitedAssistant
+      ? (normalizeText(invite.displayName) || email)
+      : (normalizeText(user.displayName) || email),
+    role: isOfficialAdmin ? ROLES.ADMIN : isInvitedAssistant ? ROLES.ASISTENTE : ROLES.DOCENTE,
+    active: isOfficialAdmin || isInvitedAssistant,
+    pending: !(isOfficialAdmin || isInvitedAssistant),
+    buttonAccess: isOfficialAdmin ? ['*'] : isInvitedAssistant && Array.isArray(invite.buttonAccess) ? invite.buttonAccess : [],
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     lastLoginAt: serverTimestamp()
   };
+
+  if (isInvitedAssistant) {
+    profile.area = normalizeArea(invite.area);
+    profile.lunchStart = invite.lunchStart || '';
+    profile.lunchMinutes = Number(invite.lunchMinutes) || 60;
+  }
 
   await setDoc(ref, profile);
   return { id: user.uid, ...profile };

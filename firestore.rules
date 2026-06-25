@@ -63,8 +63,17 @@ service cloud.firestore {
       ];
     }
 
-    function isManagerSharedAssistantEmail() {
-      return signedIn() && userEmail() == 'musicalaasesor@gmail.com';
+    // Invitacion de asistente por correo: el id del documento es el correo
+    // (en minusculas). Cada persona puede leer la suya y, si esta activa,
+    // entra directo como asistente.
+    function managerAssistantInvitePath() {
+      return /databases/$(database)/documents/apps/manager-musicala/assistantInvites/$(userEmail());
+    }
+
+    function managerHasActiveInvite() {
+      return signedIn()
+        && exists(managerAssistantInvitePath())
+        && get(managerAssistantInvitePath()).data.active == true;
     }
 
     function isManagerActiveAdmin() {
@@ -81,7 +90,7 @@ service cloud.firestore {
     function isManagerActiveUser() {
       return signedIn() && (
         isManagerBootstrapAdmin() ||
-        isManagerSharedAssistantEmail() ||
+        managerHasActiveInvite() ||
         (
           managerHasUserDoc()
           && managerUserDoc().active == true
@@ -92,7 +101,7 @@ service cloud.firestore {
     function isManagerCertificateManager() {
       return signedIn() && (
         isManagerBootstrapAdmin() ||
-        isManagerSharedAssistantEmail() ||
+        managerHasActiveInvite() ||
         (
           managerHasUserDoc()
           && managerUserDoc().active == true
@@ -112,6 +121,12 @@ service cloud.firestore {
             && request.resource.data.active == true
           ) || (
             !isManagerBootstrapAdmin()
+            && managerHasActiveInvite()
+            && request.resource.data.role == 'asistente'
+            && request.resource.data.active == true
+          ) || (
+            !isManagerBootstrapAdmin()
+            && !managerHasActiveInvite()
             && request.resource.data.role in ['docente', 'asistente']
             && request.resource.data.active == false
           )
@@ -156,7 +171,14 @@ service cloud.firestore {
         allow update: if isManagerActiveAdmin() || (
           signedIn()
           && userId == request.auth.uid
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'updatedAt', 'lastLoginAt'])
+          && (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'updatedAt', 'lastLoginAt'])
+            || (
+              managerHasActiveInvite()
+              && request.resource.data.role == 'asistente'
+              && request.resource.data.active == true
+            )
+          )
         );
         allow delete: if isManagerActiveAdmin();
       }
@@ -198,9 +220,12 @@ service cloud.firestore {
         allow create, update, delete: if isManagerCertificateManager();
       }
 
-      match /assistantAccounts/{accountId} {
-        allow read: if isManagerActiveAdmin() || isManagerSharedAssistantEmail();
-        allow write, delete: if isManagerActiveAdmin();
+      // Directorio de asistentes por correo (id del doc = correo en minusculas).
+      // Cada persona puede leer su propia invitacion para entrar directo.
+      match /assistantInvites/{inviteEmail} {
+        allow get: if isManagerActiveAdmin() || (signedIn() && inviteEmail == userEmail());
+        allow list: if isManagerActiveAdmin();
+        allow create, update, delete: if isManagerActiveAdmin();
       }
 
       // Candados (MusiLockers): todo el equipo activo ve; admin y asistentes gestionan.

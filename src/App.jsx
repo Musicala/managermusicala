@@ -2,8 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CalendarDays, Download, Eye, FileCheck2, Grid3X3, Lock, LogOut, Search, Settings, Users, X } from 'lucide-react';
 import { firebaseReady } from './firebase/firebase';
 import { ensureCurrentUserProfile, listenAuth, logout } from './services/authService';
-import { SHARED_ASSISTANT_EMAIL } from './services/authService';
-import { resolveAssistantProfile, listenAssistantAccounts } from './services/assistantAccountsService';
 import { listenButtons } from './services/buttonsService';
 import { listenSchedule } from './services/scheduleService';
 import { listenUsers } from './services/usersService';
@@ -13,7 +11,6 @@ import { DEFAULT_MANAGER_SETTINGS, listenManagerSettings } from './services/mana
 import { ROLES, getInitials, normalizeKey, normalizeText } from './utils/normalize';
 import { assetUrl } from './utils/assets';
 import LoginScreen from './components/LoginScreen';
-import AssistantIdentityScreen from './components/AssistantIdentityScreen';
 import ButtonGrid from './components/ButtonGrid';
 import ScheduleWidget from './components/ScheduleWidget';
 import AssistantSchedule from './components/AssistantSchedule';
@@ -69,7 +66,6 @@ export default function App() {
         } else {
           setProfile(null);
           setBaseProfile(null);
-          window.sessionStorage.removeItem('managerAssistantAccountId');
         }
       } catch (error) {
         setProfileError(error.message || 'No se pudo cargar el perfil.');
@@ -78,21 +74,6 @@ export default function App() {
       }
     });
   }, []);
-
-  useEffect(() => {
-    const email = normalizeText(authUser?.email).toLowerCase();
-    if (email !== SHARED_ASSISTANT_EMAIL) return undefined;
-    const savedId = window.sessionStorage.getItem('managerAssistantAccountId');
-    if (!savedId) return undefined;
-    return listenAssistantAccounts(accounts => {
-      const account = accounts.find(item => item.id === savedId && item.active !== false);
-      if (account) {
-        resolveAssistantProfile(account, authUser, { skipRestrictedLookups: true })
-          .then(setProfile)
-          .catch(error => setProfileError(error.message || 'No se pudo cargar el usuario asistente.'));
-      }
-    });
-  }, [authUser]);
 
   const isAdmin = profile?.role === ROLES.ADMIN;
   const isActive = Boolean(profile?.active || isAdmin);
@@ -138,7 +119,7 @@ export default function App() {
       ...selected,
       id: `preview:${selected.id}`,
       previewing: true,
-      email: selected.email || 'musicalaasesor@gmail.com',
+      email: selected.email || '',
       active: true,
       pending: false,
       buttonAccess: Array.isArray(selected.buttonAccess) ? selected.buttonAccess : []
@@ -183,13 +164,6 @@ export default function App() {
   if (!firebaseReady) return <ConfigMissing />;
   if (authLoading) return <LoadingScreen text="Cargando Musicala Manager..." />;
   if (!authUser) return <LoginScreen />;
-
-  const authEmail = normalizeText(authUser.email).toLowerCase();
-  const needsAssistantIdentity = authEmail === SHARED_ASSISTANT_EMAIL && !String(profile?.id || '').startsWith('assistant:');
-
-  if (needsAssistantIdentity) {
-    return <AssistantIdentityScreen authUser={authUser} onSelect={setProfile} />;
-  }
 
   if (profileError) {
     return (

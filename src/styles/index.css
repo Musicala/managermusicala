@@ -226,8 +226,26 @@ input:focus, select:focus, textarea:focus { border-color: var(--vivaldi); backgr
 .inline-title { border: 0; background: transparent; padding: 0; font-size: 1.05rem; font-weight: 800; }
 .user-main p { margin: 4px 0 0; color: var(--muted); }
 .access-tools { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip-action { border: 1.5px solid var(--line); background: #fff; color: var(--muted); border-radius: 999px; padding: 8px 10px; display: inline-flex; gap: 5px; align-items: center; font-weight: 750; }
-.chip-action.selected { background: #f5f3ff; color: #4c1d95; border-color: rgba(87,41,255,.28); }
+.chip-action { border: 1.5px solid var(--line); background: #fff; color: var(--muted); border-radius: 999px; padding: 8px 10px; display: inline-flex; gap: 5px; align-items: center; font-weight: 750; cursor: pointer; transition: .14s ease; }
+.chip-action:hover { border-color: rgba(87,41,255,.35); }
+.chip-action.selected { background: #5729ff; color: #fff; border-color: #5729ff; box-shadow: 0 2px 8px rgba(87,41,255,.22); }
+.chip-action.off { background: #fafafb; color: #9a9aa6; border-style: dashed; }
+.chip-action.off:hover { color: #4c1d95; background: #f5f3ff; border-style: solid; }
+.chip-action:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Asignador de accesos por seccion */
+.access-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #f7f6fb; border: 1.5px solid var(--line); }
+.access-count { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; color: #2c2c38; }
+.access-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.access-actions .chip-action { padding: 6px 10px; font-size: .85rem; }
+.access-hint { margin: 0; }
+.access-groups { display: grid; gap: 14px; }
+.access-group { display: grid; gap: 8px; }
+.access-group-head { display: flex; align-items: center; gap: 10px; }
+.section-toggle { display: inline-flex; align-items: center; gap: 8px; border: 0; background: transparent; padding: 0; font-weight: 850; font-size: .82rem; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); cursor: pointer; }
+.section-toggle.selected { color: #5729ff; }
+.section-count { font-size: .78rem; font-weight: 700; color: #9a9aa6; background: #efeef4; border-radius: 999px; padding: 1px 8px; text-transform: none; letter-spacing: 0; }
+.section-toggle.selected .section-count { background: #ece7ff; color: #5729ff; }
 .button-editor.new { margin: 18px 22px 0; border-color: rgba(87,41,255,.28); }
 .form-grid.button-fields { grid-template-columns: 1.3fr 2fr .8fr 1fr 70px auto; align-items: end; }
 .icon-current { width: 46px; height: 46px; border-radius: 12px; border: 1.5px solid var(--line); background: #f9f9fb; font-size: 1.25rem; display: grid; place-items: center; transition: .16s ease; }
