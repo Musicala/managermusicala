@@ -305,9 +305,14 @@ input:focus, select:focus, textarea:focus { border-color: var(--vivaldi); backgr
 }
 .schedule-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; flex: 1; }
 .schedule-header-actions .hub-chip { margin-top: 0; align-self: center; }
+.auto-fill-controls { display: flex; align-items: center; gap: 8px; }
+.auto-fill-controls select { width: auto; min-width: 170px; }
 .scenario-picker { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .scenario-picker span { white-space: nowrap; }
 .scenario-picker select { width: auto; min-width: 180px; }
+.schedule-mode-notice { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.schedule-mode-notice > div { display: flex; flex-direction: column; gap: 3px; }
+.schedule-mode-notice.date-override { border-color: #f59e0b; background: #fffbeb; }
 .task-template-list { padding: 0 22px 22px; display: grid; gap: 10px; }
 .task-template { border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 14px; background: #fff; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .task-template.editing { border-color: var(--vivaldi); background: #f5f3ff; }
@@ -391,6 +396,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--vivaldi); backgr
   .scenario-picker select { flex: 1; }
   .module-header h2 { white-space: normal; }
   .schedule-header-actions .btn { justify-content: center; }
+  .auto-fill-controls { width: 100%; align-items: stretch; flex-direction: column; }
+  .auto-fill-controls select { width: 100%; }
   .user-main { flex-direction: column; }
   .button-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); padding: 14px; }
 }

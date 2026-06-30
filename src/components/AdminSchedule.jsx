@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Briefcase, CheckCircle2, Circle, Clock, Copy, Link2, Plus, Wand2 } from 'lucide-react';
-import { saveScheduleTask, deleteScheduleTask, shiftScheduleTasks, duplicateScheduleDay } from '../services/scheduleService';
+import { createScheduleDateOverride, deleteScheduleDateOverride, deleteScheduleTask, duplicateScheduleDay, saveScheduleTask, shiftScheduleTasks, weekDateForDay } from '../services/scheduleService';
 import { DEFAULT_MANAGER_SETTINGS, listenTaskTemplates, saveManagerSettings } from '../services/managerConfigService';
 import { connectHub, hubScheduleForDay, listenHubSchedules, listenHubUser, matchHubMember } from '../services/hubService';
 import { isLunchItem } from '../utils/breaks';
@@ -31,6 +31,8 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
   const [shiftCustomDirection, setShiftCustomDirection] = useState('antes');
   const [shifting, setShifting] = useState(false);
   const [autoFilling, setAutoFilling] = useState(false);
+  const [autoFillAssistant, setAutoFillAssistant] = useState('');
+  const [savingDateMode, setSavingDateMode] = useState(false);
   const [notice, setNotice] = useState('');
   const [hubUser, setHubUser] = useState('');
   const [hubData, setHubData] = useState(null);
@@ -96,6 +98,14 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
 
   const activeScenario = settings?.activeScenario || 'normal';
   const scenarios = settings?.scenarios || DEFAULT_MANAGER_SETTINGS.scenarios;
+  const selectedDate = weekDateForDay(day);
+  const dateOverrideTasks = (allSchedule || []).filter(item =>
+    item.active !== false &&
+    item.day === day &&
+    item.scheduleDate === selectedDate &&
+    normalizeKey(item.scenario || 'normal') === normalizeKey(activeScenario)
+  );
+  const isDateOverride = dateOverrideTasks.length > 0;
 
   const hours = [];
   for (let h = TIMELINE_START; h <= TIMELINE_END; h += 1) hours.push(h);
@@ -104,8 +114,19 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
     return normalizeKey(assistant?.email || assistant?.name || assistant?.username);
   }
 
+  function assistantAliases(assistant) {
+    const email = normalizeKey(assistant?.email);
+    return [assistant?.name, assistant?.username, assistant?.email, email.split('@')[0]]
+      .map(normalizeKey)
+      .filter(Boolean);
+  }
+
   function templateAppliesToAssistant(template, assistant) {
-    return !template?.suggestedOwner || normalizeKey(template.suggestedOwner) === normalizeKey(assistant?.name);
+    const owner = normalizeKey(template?.suggestedOwner);
+    if (!owner) return true;
+    return assistantAliases(assistant).some(alias =>
+      alias === owner || alias.includes(owner) || owner.includes(alias)
+    );
   }
 
   // Ventana de almuerzo "fantasma" del asistente: solo si tiene hora configurada
@@ -364,9 +385,12 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
     const placements = [];
     let repeatIndex = 0;
     let adjustedCount = 0;
+    const autoFillAssistants = autoFillAssistant
+      ? assistants.filter(assistant => assistantKey(assistant) === autoFillAssistant)
+      : assistants;
 
     const ruleOf = name => ruleByTask[normalizeKey(name)];
-    for (const assistant of assistants) {
+    for (const assistant of autoFillAssistants) {
       const info = hubInfoByAssistant[normalizeKey(assistant.email || assistant.name)];
       if (!info?.jornada || !info.gaps.length) continue;
 
@@ -382,7 +406,8 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
       // Tarea de apertura: lo más temprano posible (primer segmento que la admita).
       const placeFront = template => {
         const duration = Number(template.durationMinutes || 30);
-        const seg = [...segments].sort((a, b) => a.start - b.start).find(s => s.end - s.start >= duration);
+        const jornadaStart = timeToMinutes(info.jornada.start);
+        const seg = segments.find(s => s.start === jornadaStart && s.end - s.start >= duration);
         if (!seg) return;
         place(template, seg.start, duration);
         seg.start += duration;
@@ -392,7 +417,8 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
       // Tarea de cierre: lo más tarde posible (último segmento que la admita).
       const placeBack = template => {
         const duration = Number(template.durationMinutes || 30);
-        const seg = [...segments].sort((a, b) => b.end - a.end).find(s => s.end - s.start >= duration);
+        const jornadaEnd = timeToMinutes(info.jornada.end);
+        const seg = segments.find(s => s.end === jornadaEnd && s.end - s.start >= duration);
         if (!seg) return;
         place(template, seg.end - duration, duration);
         seg.end -= duration;
@@ -422,7 +448,7 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
           let chosen = null;
           const pendingIdx = pendingQueue.findIndex(template =>
             Number(template.durationMinutes || 30) <= remaining &&
-            (!template.suggestedOwner || normalizeKey(template.suggestedOwner) === normalizeKey(assistant.name))
+            templateAppliesToAssistant(template, assistant)
           );
           if (pendingIdx !== -1) {
             chosen = pendingQueue.splice(pendingIdx, 1)[0];
@@ -444,7 +470,7 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
           if (!chosen && remaining >= 30) {
             const pendingLargerIdx = pendingQueue.findIndex(template =>
               Number(template.durationMinutes || 30) > remaining &&
-              (!template.suggestedOwner || normalizeKey(template.suggestedOwner) === normalizeKey(assistant.name))
+              templateAppliesToAssistant(template, assistant)
             );
             if (pendingLargerIdx !== -1) {
               chosen = pendingQueue.splice(pendingLargerIdx, 1)[0];
@@ -474,7 +500,7 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
     // Almuerzos: crea la tarea fija de almuerzo si el asistente tiene hora común
     // configurada y aún no hay una ese día. Queda como tarea editable/movible.
     const lunchPlacements = [];
-    for (const assistant of assistants) {
+    for (const assistant of autoFillAssistants) {
       const info = hubInfoByAssistant[normalizeKey(assistant.email || assistant.name)];
       if (info?.lunch) {
         lunchPlacements.push({ assistant, startMinutes: info.lunch.start, endMinutes: info.lunch.end });
@@ -506,7 +532,8 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
           description: placement.template.description || '',
           category: placement.template.category || '',
           color: 'azul',
-          scenario: settings?.activeScenario || 'normal'
+          scenario: settings?.activeScenario || 'normal',
+          scheduleDate: isDateOverride ? selectedDate : ''
         });
       }
       for (const lunch of lunchPlacements) {
@@ -520,7 +547,8 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
           description: '',
           category: 'Descanso',
           color: 'naranja',
-          scenario: settings?.activeScenario || 'normal'
+          scenario: settings?.activeScenario || 'normal',
+          scheduleDate: isDateOverride ? selectedDate : ''
         });
       }
       const adjustedNote = adjustedCount
@@ -663,7 +691,10 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
     setSaving(true);
     setError('');
     try {
-      await saveScheduleTask(payload);
+      await saveScheduleTask({
+        ...payload,
+        scheduleDate: payload.scheduleDate || (isDateOverride ? selectedDate : '')
+      });
       setEditing(null);
     } catch (err) {
       setError(err.message || 'No se pudo guardar la tarea.');
@@ -689,6 +720,36 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
       setError(err.message || 'No se pudo cambiar el escenario.');
     } finally {
       setSavingScenario(false);
+    }
+  }
+
+  async function handleCreateDateOverride() {
+    const baseTasks = (allSchedule || []).filter(item =>
+      item.active !== false && item.day === day && !item.scheduleDate &&
+      normalizeKey(item.scenario || 'normal') === normalizeKey(activeScenario)
+    );
+    setSavingDateMode(true);
+    setError('');
+    try {
+      const count = await createScheduleDateOverride(baseTasks, selectedDate);
+      setNotice(`Se creó una copia de ${count} tarea(s) solo para ${selectedDate}. Los cambios ya no alteran el horario base.`);
+    } catch (err) {
+      setError(err.message || 'No se pudo crear la excepción del día.');
+    } finally {
+      setSavingDateMode(false);
+    }
+  }
+
+  async function handleRestoreBaseDay() {
+    if (!window.confirm(`¿Descartar los cambios de ${selectedDate} y volver al horario base de los ${day}?`)) return;
+    setSavingDateMode(true);
+    try {
+      await deleteScheduleDateOverride(dateOverrideTasks);
+      setNotice(`${selectedDate} volvió al horario normal/base.`);
+    } catch (err) {
+      setError(err.message || 'No se pudo restaurar el horario base.');
+    } finally {
+      setSavingDateMode(false);
     }
   }
 
@@ -723,9 +784,24 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
             <Copy size={18} /> Duplicar día
           </button>
           {hubData && (
-            <button className="btn ghost" onClick={handleAutoFill} disabled={autoFilling}>
-              <Wand2 size={18} /> {autoFilling ? 'Rellenando...' : 'Rellenar auto'}
-            </button>
+            <div className="auto-fill-controls">
+              <select
+                value={autoFillAssistant}
+                onChange={event => setAutoFillAssistant(event.target.value)}
+                aria-label="Asistente para rellenar automáticamente"
+                disabled={autoFilling}
+              >
+                <option value="">Todas las asistentes</option>
+                {assistants.map(assistant => (
+                  <option key={assistantKey(assistant)} value={assistantKey(assistant)}>
+                    {assistant.name || assistant.email}
+                  </option>
+                ))}
+              </select>
+              <button className="btn ghost" onClick={handleAutoFill} disabled={autoFilling}>
+                <Wand2 size={18} /> {autoFilling ? 'Rellenando...' : 'Rellenar auto'}
+              </button>
+            </div>
           )}
           {!hubUser ? (
             <button className="btn ghost" onClick={handleConnectHub}>
@@ -734,7 +810,7 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
           ) : (
             <span className="hub-chip ok" title={`Conectado como ${hubUser}`}>Hub ✓</span>
           )}
-          <button className="btn primary" onClick={() => setEditing({ day, scenario: settings?.activeScenario || 'normal' })}><Plus size={18} /> Nueva tarea</button>
+          <button className="btn primary" onClick={() => setEditing({ day, scenario: settings?.activeScenario || 'normal', scheduleDate: isDateOverride ? selectedDate : '' })}><Plus size={18} /> Nueva tarea</button>
         </div>
       </div>
 
@@ -742,6 +818,24 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
       {hubError && <div className="form-error">{hubError}</div>}
       {notice && <div className="form-notice">{notice}</div>}
       {hubLoading && <div className="form-notice">Leyendo horarios del Admin Hub...</div>}
+
+      <div className={`form-notice schedule-mode-notice ${isDateOverride ? 'date-override' : ''}`}>
+        <div>
+          <strong>{isDateOverride ? `Cambio solo para ${selectedDate}` : `Horario base de los ${day}`}</strong>
+          <span>{isDateOverride
+            ? ' Puedes mover, agregar o borrar tareas sin cambiar los demás días.'
+            : ' Este horario se repite cada semana.'}</span>
+        </div>
+        {isDateOverride ? (
+          <button className="btn ghost small" onClick={handleRestoreBaseDay} disabled={savingDateMode}>
+            Marcar como día normal
+          </button>
+        ) : (
+          <button className="btn ghost small" onClick={handleCreateDateOverride} disabled={savingDateMode}>
+            Hacer cambios solo este día
+          </button>
+        )}
+      </div>
 
       {hubData && unresolvedAssistants.length > 0 && (
         <div className="coverage-panel">

@@ -3,7 +3,7 @@ import { AlertTriangle, CalendarDays, Download, Eye, FileCheck2, Grid3X3, Lock, 
 import { firebaseReady } from './firebase/firebase';
 import { ensureCurrentUserProfile, listenAuth, logout } from './services/authService';
 import { listenButtons } from './services/buttonsService';
-import { listenSchedule } from './services/scheduleService';
+import { listenSchedule, resolveScheduleForCurrentWeek } from './services/scheduleService';
 import { listenUsers } from './services/usersService';
 import { listenCertificates } from './services/certificatesService';
 import { listenLockers } from './services/lockersService';
@@ -155,7 +155,8 @@ export default function App() {
   const currentUserName = normalizeText(effectiveProfile?.displayName || authUser?.displayName || authUser?.email);
   const scenarioSchedule = useMemo(() => {
     const activeScenario = normalizeText(managerSettings.activeScenario || 'normal').toLowerCase();
-    return schedule.filter(item => normalizeText(item.scenario || 'normal').toLowerCase() === activeScenario);
+    const scenarioRows = schedule.filter(item => normalizeText(item.scenario || 'normal').toLowerCase() === activeScenario);
+    return resolveScheduleForCurrentWeek(scenarioRows);
   }, [schedule, managerSettings.activeScenario]);
   const canManageCertificates = effectiveProfile?.role === ROLES.ADMIN || effectiveProfile?.role === ROLES.ASISTENTE;
   const pendingCertificatesCount = useMemo(() => {

@@ -47,6 +47,7 @@ export function normalizeSchedulePayload(input) {
     category: normalizeText(input.category || input.categoria || ''),
     color: normalizeText(input.color || 'azul'),
     scenario: normalizeText(input.scenario || input.modo || 'normal').toLowerCase(),
+    scheduleDate: normalizeText(input.scheduleDate || input.fecha || ''),
     active: input.active !== false
   };
 }
@@ -55,7 +56,45 @@ export function normalizeSchedulePayload(input) {
 // pueda existir en varios escenarios (p. ej. normal y vacacional) sin pisarse.
 function scheduleDocId(payload) {
   const scenario = payload.scenario || 'normal';
-  return slugify(`${scenario}-${payload.day}-${payload.assistantName || payload.assistantEmail}-${payload.startTime}-${payload.task}`);
+  return slugify(`${scenario}-${payload.scheduleDate || 'base'}-${payload.day}-${payload.assistantName || payload.assistantEmail}-${payload.startTime}-${payload.task}`);
+}
+
+export function weekDateForDay(dayName, today = new Date()) {
+  const index = DAYS.indexOf(dayName);
+  const monday = new Date(today);
+  monday.setHours(12, 0, 0, 0);
+  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7) + index);
+  return `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+}
+
+export function resolveScheduleForCurrentWeek(rows) {
+  return DAYS.flatMap(day => {
+    const date = weekDateForDay(day);
+    const dated = rows.filter(item => item.day === day && item.scheduleDate === date);
+    return dated.length ? dated : rows.filter(item => item.day === day && !item.scheduleDate);
+  }).sort(sortSchedule);
+}
+
+export async function createScheduleDateOverride(baseTasks, date) {
+  if (!db) throw new Error('Firebase no está disponible.');
+  const tasks = (baseTasks || []).filter(item => item.active !== false);
+  if (!tasks.length) throw new Error('Este día no tiene horario base para copiar.');
+  const batch = writeBatch(db);
+  tasks.forEach(item => {
+    const payload = normalizeSchedulePayload({ ...item, scheduleDate: date });
+    batch.set(appDoc(db, 'schedule', scheduleDocId(payload)), {
+      ...payload, overrideFrom: item.id || '', createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+    });
+  });
+  await batch.commit();
+  return tasks.length;
+}
+
+export async function deleteScheduleDateOverride(tasks) {
+  if (!db) throw new Error('Firebase no está disponible.');
+  const batch = writeBatch(db);
+  tasks.filter(item => item.id).forEach(item => batch.delete(appDoc(db, 'schedule', item.id)));
+  await batch.commit();
 }
 
 export async function saveScheduleTask(input) {
