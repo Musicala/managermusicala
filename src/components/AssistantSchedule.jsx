@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarClock } from 'lucide-react';
 import { DAYS, scheduleItemMatchesAssistant } from '../utils/normalize';
 import { blockStyle, getTodayName, layoutOverlaps, minutesToTime, nowMinutes, TIMELINE_END, TIMELINE_START, SLOT_HEIGHT, sortSchedule, timeToMinutes } from '../utils/time';
@@ -112,9 +112,15 @@ export function CurrentTimeLine({ day, items = [] }) {
   );
 }
 
-export function TimelineCard({ item, onClick, layout, conflict = false }) {
+export function TimelineCard({ item, onClick, onMove, layout, conflict = false }) {
+  const dragRef = useRef(null);
+  const dragPreviewRef = useRef(null);
+  const suppressClickRef = useRef(false);
+  const [dragPreview, setDragPreview] = useState(null);
   const isBreak = item.type === 'break';
-  const style = blockStyle(item.startTime, item.endTime || item.startTime);
+  const shownStart = dragPreview?.startTime || item.startTime;
+  const shownEnd = dragPreview?.endTime || item.endTime;
+  const style = blockStyle(shownStart, shownEnd || shownStart);
   const minutes = item.endTime ? timeToMinutes(item.endTime) - timeToMinutes(item.startTime) : 15;
   let cardStyle = isBreak
     ? { ...style, height: '34px', minHeight: '34px' }
@@ -133,15 +139,70 @@ export function TimelineCard({ item, onClick, layout, conflict = false }) {
     };
   }
 
+  function handlePointerDown(event) {
+    if (!onMove || isBreak || event.button !== 0) return;
+    const start = timeToMinutes(item.startTime);
+    const end = timeToMinutes(item.endTime);
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+    dragRef.current = { pointerId: event.pointerId, originY: event.clientY, start, end, moved: false };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function handlePointerMove(event) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const deltaPixels = event.clientY - drag.originY;
+    if (!drag.moved && Math.abs(deltaPixels) < 5) return;
+    drag.moved = true;
+    const duration = drag.end - drag.start;
+    const snappedDelta = Math.round((deltaPixels * 30 / SLOT_HEIGHT) / 15) * 15;
+    const minStart = TIMELINE_START * 60;
+    const maxStart = (TIMELINE_END + 1) * 60 - duration;
+    const nextStart = Math.max(minStart, Math.min(maxStart, drag.start + snappedDelta));
+    const preview = {
+      startTime: minutesToTime(nextStart),
+      endTime: minutesToTime(nextStart + duration)
+    };
+    dragPreviewRef.current = preview;
+    setDragPreview(preview);
+  }
+
+  async function finishDrag(event) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    const preview = dragPreviewRef.current;
+    if (drag.moved && preview) {
+      suppressClickRef.current = true;
+      await onMove(item, preview.startTime, preview.endTime);
+      window.setTimeout(() => { suppressClickRef.current = false; }, 0);
+    }
+    dragPreviewRef.current = null;
+    setDragPreview(null);
+  }
+
   return (
     <button
-      className={`timeline-card color-${item.color || (isBreak ? 'verde' : 'azul')} ${isBreak ? 'break-card' : ''} ${conflict ? 'conflict' : ''}`}
+      className={`timeline-card color-${item.color || (isBreak ? 'verde' : 'azul')} ${isBreak ? 'break-card' : ''} ${conflict ? 'conflict' : ''} ${onMove ? 'draggable' : ''} ${dragPreview ? 'dragging' : ''}`}
       style={cardStyle}
-      onClick={onClick}
+      onClick={event => {
+        if (suppressClickRef.current) {
+          event.preventDefault();
+          return;
+        }
+        onClick?.();
+      }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={finishDrag}
+      onPointerCancel={finishDrag}
       type="button"
     >
       <strong>{isBreak ? `${item.task} · ${item.startTime}` : item.task}</strong>
-      {!isBreak && <span>{item.startTime}{item.endTime ? ` - ${item.endTime}` : ''}</span>}
+      {!isBreak && <span>{shownStart}{shownEnd ? ` - ${shownEnd}` : ''}</span>}
       {!isBreak && item.description && <small>{item.description}</small>}
       {minutes > 0 && !isBreak && <em>{minutes} min</em>}
     </button>

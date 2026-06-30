@@ -712,6 +712,17 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
     setEditing(null);
   }
 
+  async function handleMoveTask(task, startTime, endTime) {
+    if (task.startTime === startTime && task.endTime === endTime) return;
+    setError('');
+    try {
+      await saveScheduleTask({ ...task, startTime, endTime });
+      setNotice(`"${task.task}" se movió a ${startTime}-${endTime}.`);
+    } catch (err) {
+      setError(err.message || 'No se pudo mover la tarea.');
+    }
+  }
+
   async function handleScenarioChange(activeScenario) {
     setSavingScenario(true);
     setError('');
@@ -1143,6 +1154,7 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
                     layout={analysis?.layout.get(item.id)}
                     conflict={Boolean(analysis?.conflictIds.has(item.id) || analysis?.ruleIds.has(item.id))}
                     onClick={() => setEditing(item)}
+                    onMove={handleMoveTask}
                   />
                 ))}
               </div>

@@ -140,6 +140,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--vivaldi); backgr
 .timeline-card strong, .timeline-card span, .timeline-card small, .timeline-card em { display: block; }
 .timeline-card span, .timeline-card small, .timeline-card em { font-size: .76rem; opacity: .82; }
 .timeline-card em { position: absolute; right: 8px; bottom: 6px; font-style: normal; font-weight: 800; background: rgba(255,255,255,.85); border-radius: 999px; padding: 1px 7px; font-size: .72rem; }
+.timeline-card.draggable { cursor: grab; touch-action: none; }
+.timeline-card.draggable:active { cursor: grabbing; }
+.timeline-card.dragging { z-index: 20; opacity: .9; box-shadow: 0 12px 28px rgba(76, 29, 149, .28); transition: none; }
 .timeline-card strong { font-size: .9rem; line-height: 1.25; }
 .timeline-card.color-verde { border-left-color: var(--success); background: #f0fdf4; color: #166534; }
 .timeline-card.color-morado { border-left-color: var(--vivaldi); background: #f5f3ff; color: #4c1d95; }
