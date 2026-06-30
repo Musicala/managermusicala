@@ -213,3 +213,15 @@ export async function deleteScheduleTask(taskId) {
   if (!db || !taskId) throw new Error('Falta la tarea.');
   await deleteDoc(appDoc(db, 'schedule', taskId));
 }
+
+export async function deleteScheduleTasks(tasks) {
+  if (!db) throw new Error('Firebase no está disponible.');
+  const ids = [...new Set((tasks || []).map(item => item?.id).filter(Boolean))];
+  if (!ids.length) throw new Error('No hay tareas para limpiar.');
+  for (let i = 0; i < ids.length; i += 450) {
+    const batch = writeBatch(db);
+    ids.slice(i, i + 450).forEach(id => batch.delete(appDoc(db, 'schedule', id)));
+    await batch.commit();
+  }
+  return ids.length;
+}

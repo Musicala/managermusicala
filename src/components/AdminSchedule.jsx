@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Briefcase, CheckCircle2, Circle, Clock, Copy, Link2, Plus, Wand2 } from 'lucide-react';
-import { createScheduleDateOverride, deleteScheduleDateOverride, deleteScheduleTask, duplicateScheduleDay, saveScheduleTask, shiftScheduleTasks, weekDateForDay } from '../services/scheduleService';
+import { createScheduleDateOverride, deleteScheduleDateOverride, deleteScheduleTask, deleteScheduleTasks, duplicateScheduleDay, saveScheduleTask, shiftScheduleTasks, weekDateForDay } from '../services/scheduleService';
 import { DEFAULT_MANAGER_SETTINGS, listenTaskTemplates, saveManagerSettings } from '../services/managerConfigService';
 import { connectHub, hubScheduleForDay, listenHubSchedules, listenHubUser, matchHubMember } from '../services/hubService';
 import { isLunchItem } from '../utils/breaks';
@@ -31,6 +31,7 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
   const [shiftCustomDirection, setShiftCustomDirection] = useState('antes');
   const [shifting, setShifting] = useState(false);
   const [autoFilling, setAutoFilling] = useState(false);
+  const [clearingSchedule, setClearingSchedule] = useState(false);
   const [autoFillAssistant, setAutoFillAssistant] = useState('');
   const [savingDateMode, setSavingDateMode] = useState(false);
   const [notice, setNotice] = useState('');
@@ -740,6 +741,33 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
     }
   }
 
+  async function handleClearSchedule() {
+    const selectedAssistant = autoFillAssistant
+      ? assistants.find(assistant => assistantKey(assistant) === autoFillAssistant)
+      : null;
+    const targets = schedule
+      .filter(item => item.active !== false && item.day === day)
+      .filter(item => selectedAssistant ? scheduleItemMatchesAssistant(item, selectedAssistant) : true);
+    if (!targets.length) {
+      setError(`No hay tareas para limpiar el ${day}${selectedAssistant ? ` de ${selectedAssistant.name}` : ''}.`);
+      return;
+    }
+    const who = selectedAssistant ? selectedAssistant.name : 'todas las asistentes';
+    const layer = isDateOverride ? `solo del ${selectedDate}` : `del horario base de los ${day}`;
+    if (!window.confirm(`¿Eliminar ${targets.length} tarea(s) de ${who} ${layer}? Esta acción no se puede deshacer.`)) return;
+    setClearingSchedule(true);
+    setError('');
+    setNotice('');
+    try {
+      const count = await deleteScheduleTasks(targets);
+      setNotice(`Se limpiaron ${count} tarea(s) de ${who} ${layer}.`);
+    } catch (err) {
+      setError(err.message || 'No se pudo limpiar el horario.');
+    } finally {
+      setClearingSchedule(false);
+    }
+  }
+
   async function handleRestoreBaseDay() {
     if (!window.confirm(`¿Descartar los cambios de ${selectedDate} y volver al horario base de los ${day}?`)) return;
     setSavingDateMode(true);
@@ -800,6 +828,9 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
               </select>
               <button className="btn ghost" onClick={handleAutoFill} disabled={autoFilling}>
                 <Wand2 size={18} /> {autoFilling ? 'Rellenando...' : 'Rellenar auto'}
+              </button>
+              <button className="btn danger" onClick={handleClearSchedule} disabled={clearingSchedule || autoFilling}>
+                {clearingSchedule ? 'Limpiando...' : 'Limpiar horario'}
               </button>
             </div>
           )}
