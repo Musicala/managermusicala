@@ -7,6 +7,12 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.email != null;
     }
 
+    // Las pruebas de nomina de Cata usan exclusivamente cuentas de Google.
+    function googleUser() {
+      return signedIn()
+        && request.auth.token.firebase.sign_in_provider == "google.com";
+    }
+
     // Correo normalizado (minusculas) del usuario autenticado.
     function userEmail() {
       return request.auth.token.email.lower();
@@ -218,6 +224,46 @@ service cloud.firestore {
       match /certificates/{certificateId} {
         allow read: if isManagerActiveUser();
         allow create, update, delete: if isManagerCertificateManager();
+      }
+
+      // Novedades de nomina: cualquier cuenta Google puede crear y consultar.
+      // Una novedad creada solo puede cambiar de estado y registrar quien/cuando
+      // hizo el cambio; no se permite borrar el historial.
+      match /novedades_nomina/{docId} {
+        allow create, read: if googleUser();
+        allow update: if googleUser()
+          && request.resource.data.diff(resource.data).changedKeys()
+            .hasOnly(['estado', 'actualizadoPor', 'actualizadoEn']);
+        allow delete: if false;
+      }
+
+      // Directorio de empleados usado por el flujo de nomina de Cata.
+      match /empleados/{docId} {
+        allow create, read, update: if googleUser();
+        allow delete: if false;
+      }
+
+      // Notas personales del equipo. Cada usuario gestiona las suyas; los
+      // administradores ven y auditan todas. Nunca se eliminan físicamente.
+      match /workNotes/{noteId} {
+        allow create: if isManagerActiveUser()
+          && request.resource.data.ownerUid == request.auth.uid
+          && request.resource.data.deleted == false;
+        allow read: if isManagerActiveAdmin()
+          || (isManagerActiveUser() && resource.data.ownerUid == request.auth.uid);
+        allow update: if isManagerActiveAdmin() || (
+          isManagerActiveUser()
+          && resource.data.ownerUid == request.auth.uid
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.ownerEmail == resource.data.ownerEmail
+        );
+        allow delete: if false;
+      }
+
+      match /workNotePreferences/{userId} {
+        allow read, create, update: if isManagerActiveAdmin()
+          || (isManagerActiveUser() && userId == request.auth.uid);
+        allow delete: if false;
       }
 
       // Directorio de asistentes por correo (id del doc = correo en minusculas).

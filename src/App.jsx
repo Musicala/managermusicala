@@ -20,6 +20,7 @@ import DataManager from './components/DataManager';
 import ManagerSettings from './components/ManagerSettings';
 import CertificatesManager from './components/CertificatesManager';
 import LockersManager from './components/LockersManager';
+import WorkNotes from './components/WorkNotes';
 
 const NAV_ITEMS = [
   { id: 'tools', label: 'Herramientas', icon: Grid3X3, roles: ['*'] },
@@ -269,7 +270,12 @@ export default function App() {
             <ScheduleWidget schedule={scenarioSchedule} user={effectiveProfile} settings={managerSettings} />
           )}
 
-          {activeView === 'tools' && <ButtonGrid buttons={visibleButtons} search={search} />}
+          {activeView === 'tools' && (
+            <ButtonGrid buttons={visibleButtons} search={search} onOpenWorkNotes={() => setActiveView('work-notes')} />
+          )}
+          {activeView === 'work-notes' && canManageCertificates && (
+            <WorkNotes authUser={authUser} userName={currentUserName} isAdmin={effectiveIsAdmin} />
+          )}
           {activeView === 'my-schedule' && <AssistantSchedule schedule={scenarioSchedule} user={effectiveProfile} settings={managerSettings} />}
           {activeView === 'admin-schedule' && effectiveIsAdmin && <AdminSchedule schedule={scenarioSchedule} allSchedule={schedule} users={users} settings={managerSettings} />}
           {activeView === 'certificates' && canManageCertificates && (
@@ -290,6 +296,7 @@ export default function App() {
 function getViewTitle(view) {
   const map = {
     tools: 'Herramientas',
+    'work-notes': 'Notas de trabajo',
     'my-schedule': 'Mi horario',
     'admin-schedule': 'Gestion de horario',
     certificates: 'Certificados',

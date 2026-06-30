@@ -1,7 +1,7 @@
-import { ExternalLink, SearchX } from 'lucide-react';
+import { ArrowRight, ExternalLink, SearchX, StickyNote } from 'lucide-react';
 import { normalizeKey } from '../utils/normalize';
 
-export default function ButtonGrid({ buttons, search }) {
+export default function ButtonGrid({ buttons, search, onOpenWorkNotes }) {
   const query = normalizeKey(search);
   const filtered = buttons.filter(button => {
     if (!query) return true;
@@ -22,7 +22,9 @@ export default function ButtonGrid({ buttons, search }) {
     return acc;
   }, {});
 
-  if (!filtered.length) {
+  const showWorkNotes = !query || normalizeKey('Notas de trabajo post-it bitacora pendientes ideas').includes(query);
+
+  if (!filtered.length && !showWorkNotes) {
     return (
       <div className="empty-card">
         <SearchX size={34} />
@@ -58,6 +60,27 @@ export default function ButtonGrid({ buttons, search }) {
           </div>
         </section>
       ))}
+      {showWorkNotes && (
+        <section className="module-card">
+          <div className="module-header">
+            <div>
+              <p className="eyebrow">Sección</p>
+              <h2>Notas de trabajo</h2>
+            </div>
+            <span className="pill">1</span>
+          </div>
+          <div className="button-grid">
+            <button className="app-button work-notes-launcher" onClick={onOpenWorkNotes}>
+              <span className="button-icon"><StickyNote size={25} /></span>
+              <span>
+                <strong>Mi bitácora de post-its</strong>
+                <small>Notas sincronizadas en Firestore</small>
+              </span>
+              <ArrowRight size={18} />
+            </button>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
