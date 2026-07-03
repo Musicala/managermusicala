@@ -10,8 +10,6 @@ export const DEFAULT_MANAGER_SETTINGS = {
   notificationRepeatSeconds: 25,
   taskStartMinutesBefore: 5,
   taskChangeMinutesBefore: 3,
-  breakIntervalMinutes: 135,
-  breakDurationMinutes: 5,
   activeScenario: 'normal',
   scenarios: [
     { id: 'normal', name: 'Horario normal' },
@@ -116,8 +114,12 @@ export async function saveTaskTemplate(template) {
     priority: String(template.priority || 'Media').trim(),
     repeatable: template.repeatable === true,
     suggestedOwner: String(template.suggestedOwner || '').trim(),
-    placementRule: ['inicio', 'fin'].includes(template.placementRule) ? template.placementRule : '',
+    placementRule: ['inicio', 'fin', 'hora', 'manana', 'tarde'].includes(template.placementRule) ? template.placementRule : '',
     placementMinutes: Number(template.placementMinutes) || 30,
+    fixedTime: String(template.fixedTime || '').trim(),
+    allowedDays: Array.isArray(template.allowedDays)
+      ? template.allowedDays.map(day => String(day || '').trim()).filter(Boolean)
+      : [],
     active: template.active !== false,
     updatedAt: serverTimestamp(),
     createdAt: template.createdAt || serverTimestamp()

@@ -316,6 +316,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--vivaldi); backgr
 .schedule-mode-notice { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .schedule-mode-notice > div { display: flex; flex-direction: column; gap: 3px; }
 .schedule-mode-notice.date-override { border-color: #f59e0b; background: #fffbeb; }
+.template-days { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+.template-days legend { padding: 0 6px; font-weight: 800; color: var(--ink); }
+.template-days .muted { margin: 0 0 10px; }
 .task-template-list { padding: 0 22px 22px; display: grid; gap: 10px; }
 .task-template { border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 14px; background: #fff; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .task-template.editing { border-color: var(--vivaldi); background: #f5f3ff; }

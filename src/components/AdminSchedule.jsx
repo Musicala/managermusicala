@@ -130,6 +130,12 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
     );
   }
 
+  function templateAppliesToDay(template, dayName = day) {
+    return !Array.isArray(template?.allowedDays) ||
+      template.allowedDays.length === 0 ||
+      template.allowedDays.includes(dayName);
+  }
+
   // Ventana de almuerzo "fantasma" del asistente: solo si tiene hora configurada
   // y todavía no hay una tarea de almuerzo ese día (si ya existe, se respeta esa).
   function lunchWindowFor(assistant, dayItems) {
@@ -155,7 +161,7 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
   const coverage = useMemo(() => {
     const dayItems = schedule.filter(item => item.active !== false && item.day === day);
     return assistants.flatMap(assistant => taskTemplates
-      .filter(template => templateAppliesToAssistant(template, assistant))
+      .filter(template => templateAppliesToAssistant(template, assistant) && templateAppliesToDay(template))
       .map(template => ({
         assistant,
         template,
@@ -269,8 +275,12 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
     const map = {};
     for (const template of taskTemplates) {
       const rule = template.placementRule;
-      if (rule === 'inicio' || rule === 'fin') {
-        map[normalizeKey(template.name)] = { rule, minutes: Number(template.placementMinutes) || 30 };
+      if (['inicio', 'fin', 'hora', 'manana', 'tarde'].includes(rule)) {
+        map[normalizeKey(template.name)] = {
+          rule,
+          minutes: Number(template.placementMinutes) || 30,
+          fixedTime: template.fixedTime || ''
+        };
       }
     }
     return map;
@@ -314,6 +324,25 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
           ruleWarnings.push({
             id: item.id,
             message: `"${item.task}" debería ir en los primeros ${rule.minutes} min del día (apertura ${minutesToTime(dayStart)}), no en ${item.startTime}–${item.endTime}.`
+          });
+        }
+        if (rule.rule === 'hora' && Number.isFinite(timeToMinutes(rule.fixedTime)) && start !== timeToMinutes(rule.fixedTime)) {
+          ruleWarnings.push({
+            id: item.id,
+            message: `"${item.task}" debe iniciar siempre a las ${rule.fixedTime}, no a las ${item.startTime}.`
+          });
+        }
+        const lunch = hubInfoByAssistant[key]?.lunch;
+        if (rule.rule === 'manana' && lunch && end > lunch.start) {
+          ruleWarnings.push({
+            id: item.id,
+            message: `"${item.task}" debe quedar antes del almuerzo (${minutesToTime(lunch.start)}).`
+          });
+        }
+        if (rule.rule === 'tarde' && lunch && start < lunch.end) {
+          ruleWarnings.push({
+            id: item.id,
+            message: `"${item.task}" debe quedar después del almuerzo (${minutesToTime(lunch.end)}).`
           });
         }
       }
@@ -381,7 +410,9 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
       return keys.some(key => assignedKeys.has(`${taskKey}::${key}`));
     };
     const prioRank = { Alta: 0, Media: 1, Baja: 2 };
-    const repeatables = taskTemplates.filter(template => template.repeatable === true);
+    const repeatables = taskTemplates.filter(template =>
+      template.repeatable === true && templateAppliesToDay(template)
+    );
 
     const placements = [];
     let repeatIndex = 0;
@@ -402,6 +433,16 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
       const place = (template, startMinutes, durationMinutes) => {
         placements.push({ assistant, startMinutes, endMinutes: startMinutes + durationMinutes, template });
         assignedKeys.add(`${normalizeKey(template.name)}::${assistantKey(assistant)}`);
+      };
+
+      const consumeSegment = (template, seg, startMinutes, durationMinutes) => {
+        place(template, startMinutes, durationMinutes);
+        const originalEnd = seg.end;
+        seg.end = startMinutes;
+        if (startMinutes + durationMinutes < originalEnd) {
+          segments.push({ start: startMinutes + durationMinutes, end: originalEnd });
+        }
+        dropTiny();
       };
 
       // Tarea de apertura: lo más temprano posible (primer segmento que la admita).
@@ -426,21 +467,53 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
         dropTiny();
       };
 
+      const placeFixed = template => {
+        const duration = Number(template.durationMinutes || 30);
+        const fixedStart = timeToMinutes(ruleOf(template.name)?.fixedTime);
+        if (!Number.isFinite(fixedStart)) return;
+        const seg = segments.find(s => s.start <= fixedStart && s.end >= fixedStart + duration);
+        if (seg) consumeSegment(template, seg, fixedStart, duration);
+      };
+
+      const placeInPeriod = (template, period) => {
+        const duration = Number(template.durationMinutes || 30);
+        const lunchStart = info.lunch?.start;
+        const lunchEnd = info.lunch?.end;
+        const eligible = [...segments]
+          .sort((a, b) => a.start - b.start)
+          .filter(seg => period === 'manana'
+            ? (!Number.isFinite(lunchStart) || seg.start < lunchStart)
+            : (!Number.isFinite(lunchEnd) || seg.end > lunchEnd));
+        const seg = eligible.find(candidate => {
+          const start = period === 'manana' ? candidate.start : Math.max(candidate.start, lunchEnd || candidate.start);
+          const endLimit = period === 'manana' ? Math.min(candidate.end, lunchStart || candidate.end) : candidate.end;
+          return endLimit - start >= duration;
+        });
+        if (!seg) return;
+        const start = period === 'manana' ? seg.start : Math.max(seg.start, lunchEnd || seg.start);
+        consumeSegment(template, seg, start, duration);
+      };
+
       const pending = taskTemplates
-        .filter(template => templateAppliesToAssistant(template, assistant))
+        .filter(template => templateAppliesToAssistant(template, assistant) && templateAppliesToDay(template))
         .filter(template => !isAssignedToAssistant(template, assistant))
         .sort((a, b) => (prioRank[a.priority] ?? 1) - (prioRank[b.priority] ?? 1));
 
       // 1) Apertura primero (temprano), 2) cierre (tarde), antes de rellenar el resto.
+      pending.filter(t => ruleOf(t.name)?.rule === 'hora').forEach(placeFixed);
       pending.filter(t => ruleOf(t.name)?.rule === 'inicio').forEach(placeFront);
       pending.filter(t => ruleOf(t.name)?.rule === 'fin').forEach(placeBack);
+      pending.filter(t => ruleOf(t.name)?.rule === 'manana').forEach(t => placeInPeriod(t, 'manana'));
+      pending.filter(t => ruleOf(t.name)?.rule === 'tarde').forEach(t => placeInPeriod(t, 'tarde'));
 
       // 3) Resto de tareas (sin regla) por prioridad, luego repetibles, en lo que quede libre.
       const pendingQueue = pending.filter(t => {
         const rule = ruleOf(t.name)?.rule;
-        return rule !== 'inicio' && rule !== 'fin';
+        return !['inicio', 'fin', 'hora', 'manana', 'tarde'].includes(rule);
       });
-      const assistantRepeatables = repeatables.filter(template => templateAppliesToAssistant(template, assistant));
+      const assistantRepeatables = repeatables.filter(template =>
+        templateAppliesToAssistant(template, assistant) && !ruleOf(template.name)
+      );
       for (const seg of [...segments].sort((a, b) => a.start - b.start)) {
         let cursor = seg.start;
         const gapEnd = seg.end;

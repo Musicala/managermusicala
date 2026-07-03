@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bell, Plus, Save, Trash2, UserPlus, Volume2 } from 'lucide-react';
 import { deleteAssistantInvite, listenAssistantInvites, saveAssistantInvite } from '../services/assistantAccountsService';
-import { AREA_LABELS, AREAS, BUTTON_SECTION_OPTIONS, normalizeButtonSections } from '../utils/normalize';
+import { AREA_LABELS, AREAS, BUTTON_SECTION_OPTIONS, DAYS, normalizeButtonSections } from '../utils/normalize';
 import {
   DEFAULT_MANAGER_SETTINGS,
   listenManagerSettings,
@@ -23,6 +23,8 @@ const EMPTY_TEMPLATE = {
   suggestedOwner: '',
   placementRule: '',
   placementMinutes: 30,
+  fixedTime: '',
+  allowedDays: [],
   repeatable: false,
   active: true
 };
@@ -332,14 +334,6 @@ export default function ManagerSettings({ users = [] }) {
               <span>Antes de cambio de tarea</span>
               <input type="number" min="0" value={settings.taskChangeMinutesBefore} onChange={e => setField('taskChangeMinutesBefore', Number(e.target.value))} />
             </label>
-            <label>
-              <span>Pausa cada minutos</span>
-              <input type="number" min="30" step="5" value={settings.breakIntervalMinutes} onChange={e => setField('breakIntervalMinutes', Number(e.target.value))} />
-            </label>
-            <label>
-              <span>Duracion pausa</span>
-              <input type="number" min="1" step="1" value={settings.breakDurationMinutes} onChange={e => setField('breakDurationMinutes', Number(e.target.value))} />
-            </label>
           </div>
           <div className="subsection-head">
             <div>
@@ -627,9 +621,12 @@ export default function ManagerSettings({ users = [] }) {
                 <option value="">Sin regla (cualquier hora)</option>
                 <option value="inicio">Al inicio del día (apertura)</option>
                 <option value="fin">Al final del día (cierre)</option>
+                <option value="hora">Siempre a una hora específica</option>
+                <option value="manana">En la mañana (antes del almuerzo)</option>
+                <option value="tarde">En la tarde (después del almuerzo)</option>
               </select>
             </label>
-            {template.placementRule && (
+            {['inicio', 'fin'].includes(template.placementRule) && (
               <label>
                 <span>Ventana en minutos</span>
                 <input
@@ -641,7 +638,40 @@ export default function ManagerSettings({ users = [] }) {
                 />
               </label>
             )}
+            {template.placementRule === 'hora' && (
+              <label>
+                <span>Hora fija de inicio</span>
+                <input
+                  type="time"
+                  step="900"
+                  value={template.fixedTime || ''}
+                  onChange={e => setTemplate(current => ({ ...current, fixedTime: e.target.value }))}
+                  required
+                />
+              </label>
+            )}
           </div>
+          <fieldset className="template-days">
+            <legend>Días permitidos</legend>
+            <p className="muted">Sin marcar significa que puede usarse cualquier día.</p>
+            <div className="shift-days">
+              {DAYS.slice(0, 6).map(dayName => (
+                <label className="day-check" key={dayName}>
+                  <input
+                    type="checkbox"
+                    checked={(template.allowedDays || []).includes(dayName)}
+                    onChange={e => setTemplate(current => ({
+                      ...current,
+                      allowedDays: e.target.checked
+                        ? [...(current.allowedDays || []), dayName]
+                        : (current.allowedDays || []).filter(item => item !== dayName)
+                    }))}
+                  />
+                  <span>{dayName}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <label className="checkbox-label">
             <input
               type="checkbox"
@@ -672,6 +702,10 @@ export default function ManagerSettings({ users = [] }) {
                   {item.repeatable ? ' · 🔁 repetible' : ''}
                   {item.placementRule === 'fin' ? ` · 🔒 cierre (últimos ${item.placementMinutes || 30} min)` : ''}
                   {item.placementRule === 'inicio' ? ` · 🔓 apertura (primeros ${item.placementMinutes || 30} min)` : ''}
+                  {item.placementRule === 'hora' ? ` · 🕐 siempre a las ${item.fixedTime || '—'}` : ''}
+                  {item.placementRule === 'manana' ? ' · ☀️ antes del almuerzo' : ''}
+                  {item.placementRule === 'tarde' ? ' · 🌙 después del almuerzo' : ''}
+                  {item.allowedDays?.length ? ` · 📅 ${item.allowedDays.join(', ')}` : ''}
                 </span>
                 {item.description && <span className="task-template-desc">{item.description}</span>}
               </div>
