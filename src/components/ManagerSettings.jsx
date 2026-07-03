@@ -337,6 +337,38 @@ export default function ManagerSettings({ users = [] }) {
           </div>
           <div className="subsection-head">
             <div>
+              <p className="eyebrow">Pausas activas</p>
+              <h3>Reglas de ubicación</h3>
+            </div>
+          </div>
+          <div className="form-grid two">
+            <label>
+              <span>Duración de la pausa (min)</span>
+              <input type="number" min="1" step="1" value={settings.activeBreakDurationMinutes ?? 10} onChange={e => setField('activeBreakDurationMinutes', Number(e.target.value))} />
+            </label>
+            <label>
+              <span>Máximo de pausas por día</span>
+              <input type="number" min="0" max="4" step="1" value={settings.maxActiveBreaksPerDay ?? 2} onChange={e => setField('maxActiveBreaksPerDay', Number(e.target.value))} />
+            </label>
+            <label>
+              <span>Minutos libres antes del almuerzo</span>
+              <input type="number" min="0" step="5" value={settings.minMinutesBeforeLunch ?? 45} onChange={e => setField('minMinutesBeforeLunch', Number(e.target.value))} />
+            </label>
+            <label>
+              <span>Minutos libres después del almuerzo</span>
+              <input type="number" min="0" step="5" value={settings.minMinutesAfterLunch ?? 30} onChange={e => setField('minMinutesAfterLunch', Number(e.target.value))} />
+            </label>
+            <label>
+              <span>Sin pausas antes del cierre (min)</span>
+              <input type="number" min="0" step="5" value={settings.minMinutesBeforeEndOfDay ?? 60} onChange={e => setField('minMinutesBeforeEndOfDay', Number(e.target.value))} />
+            </label>
+            <label>
+              <span>No partir bloques de (min) o menos</span>
+              <input type="number" min="0" step="5" value={settings.minSplitBlockMinutes ?? 30} onChange={e => setField('minSplitBlockMinutes', Number(e.target.value))} />
+            </label>
+          </div>
+          <div className="subsection-head">
+            <div>
               <p className="eyebrow">Textos</p>
               <h3>Mensajes que aparecen</h3>
             </div>

@@ -10,6 +10,12 @@ export const DEFAULT_MANAGER_SETTINGS = {
   notificationRepeatSeconds: 25,
   taskStartMinutesBefore: 5,
   taskChangeMinutesBefore: 3,
+  activeBreakDurationMinutes: 10,
+  maxActiveBreaksPerDay: 2,
+  minMinutesBeforeLunch: 45,
+  minMinutesAfterLunch: 30,
+  minMinutesBeforeEndOfDay: 60,
+  minSplitBlockMinutes: 30,
   activeScenario: 'normal',
   scenarios: [
     { id: 'normal', name: 'Horario normal' },
