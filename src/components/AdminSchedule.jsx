@@ -1040,17 +1040,20 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
           <div className="shift-days">
             <span className="muted">Copiar a:</span>
             {DAYS.slice(0, 6)
-              .filter(name => normalizeKey(duplicateScenario) !== normalizeKey(activeScenario) || name !== day)
-              .map(name => (
-                <label key={name} className="day-check">
+              .map(name => {
+                const isSourceDay = normalizeKey(duplicateScenario) === normalizeKey(activeScenario) && name === day;
+                return (
+                <label key={name} className="day-check" title={isSourceDay ? 'Este es el día de origen' : undefined}>
                   <input
                     type="checkbox"
                     checked={duplicateDays.includes(name)}
+                    disabled={isSourceDay}
                     onChange={() => toggleDuplicateDay(name)}
                   />
-                  <span>{name}</span>
+                  <span>{name}{isSourceDay ? ' (origen)' : ''}</span>
                 </label>
-              ))}
+                );
+              })}
             <button
               type="button"
               className="btn ghost small"
