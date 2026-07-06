@@ -279,6 +279,12 @@ service cloud.firestore {
         allow read: if isManagerActiveUser();
         allow create, update, delete: if isManagerCertificateManager();
       }
+
+      // Parqueadero (motos y ciclas): todo el equipo activo ve; admin y asistentes gestionan.
+      match /parking/{spotId} {
+        allow read: if isManagerActiveUser();
+        allow create, update, delete: if isManagerCertificateManager();
+      }
     }
 
     // Todo lo demas, denegado.

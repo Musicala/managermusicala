@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CalendarDays, Download, Eye, FileCheck2, Grid3X3, Lock, LogOut, Search, Settings, Users, X } from 'lucide-react';
+import { AlertTriangle, CalendarDays, Download, Eye, FileCheck2, Grid3X3, Lock, LogOut, ParkingSquare, Search, Settings, Users, X } from 'lucide-react';
 import { firebaseReady } from './firebase/firebase';
 import { ensureCurrentUserProfile, listenAuth, logout } from './services/authService';
 import { listenButtons } from './services/buttonsService';
@@ -7,6 +7,7 @@ import { listenSchedule, resolveScheduleForCurrentWeek } from './services/schedu
 import { listenUsers } from './services/usersService';
 import { listenCertificates } from './services/certificatesService';
 import { listenLockers } from './services/lockersService';
+import { listenParking } from './services/parkingService';
 import { DEFAULT_MANAGER_SETTINGS, listenManagerSettings } from './services/managerConfigService';
 import { ROLES, getInitials, normalizeKey, normalizeText } from './utils/normalize';
 import { assetUrl } from './utils/assets';
@@ -20,6 +21,7 @@ import DataManager from './components/DataManager';
 import ManagerSettings from './components/ManagerSettings';
 import CertificatesManager from './components/CertificatesManager';
 import LockersManager from './components/LockersManager';
+import ParkingManager from './components/ParkingManager';
 import WorkNotes from './components/WorkNotes';
 
 const NAV_ITEMS = [
@@ -28,6 +30,7 @@ const NAV_ITEMS = [
   { id: 'admin-schedule', label: 'Gestionar horario', icon: CalendarDays, roles: ['admin'] },
   { id: 'certificates', label: 'Certificados', icon: FileCheck2, roles: ['admin', 'asistente'] },
   { id: 'lockers', label: 'MusiLockers', icon: Lock, roles: ['admin', 'asistente'] },
+  { id: 'parking', label: 'Parqueadero', icon: ParkingSquare, roles: ['admin', 'asistente'] },
   { id: 'data', label: 'Botones', icon: Download, roles: ['admin'] },
   { id: 'users', label: 'Usuarios', icon: Users, roles: ['admin'] },
   { id: 'settings', label: 'Configuracion', icon: Settings, roles: ['admin'] }
@@ -44,6 +47,7 @@ export default function App() {
   const [users, setUsers] = useState([]);
   const [certificates, setCertificates] = useState([]);
   const [lockers, setLockers] = useState([]);
+  const [parking, setParking] = useState([]);
   const [activeView, setActiveView] = useState('tools');
   const [search, setSearch] = useState('');
   const [managerSettings, setManagerSettings] = useState(DEFAULT_MANAGER_SETTINGS);
@@ -86,6 +90,7 @@ export default function App() {
     const unsubUsers = isAdmin ? listenUsers(setUsers) : () => {};
     const unsubCertificates = listenCertificates(setCertificates);
     const unsubLockers = listenLockers(setLockers);
+    const unsubParking = listenParking(setParking);
     const unsubSettings = listenManagerSettings(setManagerSettings);
     return () => {
       unsubButtons();
@@ -93,6 +98,7 @@ export default function App() {
       unsubUsers();
       unsubCertificates();
       unsubLockers();
+      unsubParking();
       unsubSettings();
     };
   }, [isActive, isAdmin]);
@@ -285,6 +291,9 @@ export default function App() {
           {activeView === 'lockers' && canManageCertificates && (
             <LockersManager lockers={lockers} currentUserName={currentUserName} canManage={canManageCertificates} />
           )}
+          {activeView === 'parking' && canManageCertificates && (
+            <ParkingManager spots={parking} currentUserName={currentUserName} canManage={canManageCertificates} />
+          )}
           {activeView === 'data' && effectiveIsAdmin && <DataManager buttons={buttons} settings={managerSettings} />}
           {activeView === 'users' && effectiveIsAdmin && <UsersAdmin users={users} buttons={buttons} />}
           {activeView === 'settings' && effectiveIsAdmin && <ManagerSettings users={users} />}
@@ -302,6 +311,7 @@ function getViewTitle(view) {
     'admin-schedule': 'Gestion de horario',
     certificates: 'Certificados',
     lockers: 'MusiLockers',
+    parking: 'Parqueadero',
     data: 'Gestion de botones',
     users: 'Usuarios y accesos',
     settings: 'Configuracion'
