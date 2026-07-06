@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, Check, Copy, Download, Lightbulb, ListTodo, Plus, Search, StickyNote, Upload, X } from 'lucide-react';
+import { Archive, Check, Copy, Download, LayoutGrid, Lightbulb, ListTodo, PanelLeftClose, PanelLeftOpen, Plus, Search, SlidersHorizontal, StickyNote, Upload, X } from 'lucide-react';
 import { listenWorkNotePreferences, listenWorkNotes, saveWorkNote, saveWorkNotePreferences, softDeleteWorkNote } from '../services/workNotesService';
 
 const EMPTY = { title: '', content: '', type: 'quick', priority: 'media', category: '', tags: [], checklist: [], dueDate: '', reminderAt: '', pinned: false, archived: false };
@@ -27,10 +27,30 @@ export default function WorkNotes({ authUser, userName, isAdmin }) {
   const [tag, setTag] = useState('');
   const [theme, setTheme] = useState('violeta');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [density, setDensity] = useState('cozy');
+  const [corkboard, setCorkboard] = useState(false);
+  const prefsLoaded = useRef(false);
   const importRef = useRef(null);
 
   useEffect(() => listenWorkNotes(authUser.uid, isAdmin, setNotes, err => setError(err.message)), [authUser.uid, isAdmin]);
-  useEffect(() => listenWorkNotePreferences(authUser.uid, data => setTheme(data.theme || 'violeta')), [authUser.uid]);
+  useEffect(() => listenWorkNotePreferences(authUser.uid, data => {
+    setTheme(data.theme || 'violeta');
+    setDensity(data.density === 'compact' ? 'compact' : 'cozy');
+    setCorkboard(Boolean(data.corkboard));
+    if (data.sidebarOpen !== undefined) setSidebarOpen(Boolean(data.sidebarOpen));
+    if (data.filtersOpen !== undefined) setFiltersOpen(Boolean(data.filtersOpen));
+    prefsLoaded.current = true;
+  }), [authUser.uid]);
+
+  function updatePref(patch) {
+    if (patch.density !== undefined) setDensity(patch.density);
+    if (patch.corkboard !== undefined) setCorkboard(patch.corkboard);
+    if (patch.sidebarOpen !== undefined) setSidebarOpen(patch.sidebarOpen);
+    if (patch.filtersOpen !== undefined) setFiltersOpen(patch.filtersOpen);
+    if (prefsLoaded.current) saveWorkNotePreferences(authUser.uid, patch).catch(() => {});
+  }
 
   const visible = useMemo(() => notes.filter(note => {
     if (Boolean(note.deleted) !== showDeleted) return false;
@@ -98,7 +118,7 @@ export default function WorkNotes({ authUser, userName, isAdmin }) {
   }
 
   return (
-    <div className={`work-notes notes-theme-${theme}`}>
+    <div className={`work-notes notes-theme-${theme} density-${density} ${sidebarOpen ? '' : 'sidebar-collapsed'} ${corkboard ? 'corkboard' : ''}`}>
       <aside className="notes-sidebar">
         <div className="notes-brand"><StickyNote size={28} /><div><small>Musicala</small><strong>Notas al vuelo</strong></div></div>
         <button className="notes-primary" onClick={() => setDraft({ ...EMPTY })}><Plus size={18} /> Post-it nuevo</button>
@@ -108,11 +128,13 @@ export default function WorkNotes({ authUser, userName, isAdmin }) {
       </aside>
 
       <section className="notes-main">
-        <header className="notes-heading"><div><h1>Hola, {firstName(userName)}</h1><p>Ideas, pendientes y recordatorios sincronizados en Firestore.</p></div><button className="notes-primary" onClick={() => setDraft({ ...EMPTY })}><Plus size={18} /> Post-it</button></header>
+        <header className="notes-heading"><div className="notes-heading-left"><button className="notes-icon-btn" title={sidebarOpen ? 'Ocultar panel' : 'Mostrar panel'} onClick={() => updatePref({ sidebarOpen: !sidebarOpen })}>{sidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}</button><div><h1>Hola, {firstName(userName)}</h1><p>Ideas, pendientes y recordatorios sincronizados en Firestore.</p></div></div><div className="notes-heading-actions"><button className={`notes-icon-btn ${density === 'compact' ? 'active' : ''}`} title="Alternar densidad de post-its" onClick={() => updatePref({ density: density === 'compact' ? 'cozy' : 'compact' })}><LayoutGrid size={18} /> {density === 'compact' ? 'Cómodo' : 'Compacto'}</button><button className={`notes-icon-btn ${filtersOpen ? 'active' : ''}`} title="Filtros y opciones" onClick={() => updatePref({ filtersOpen: !filtersOpen })}><SlidersHorizontal size={18} /> Filtros</button><button className="notes-primary" onClick={() => setDraft({ ...EMPTY })}><Plus size={18} /> Post-it</button></div></header>
         <div className="quick-note"><textarea value={quick} onChange={e => setQuick(e.target.value)} placeholder="Escribe una nota rápida..." /><button disabled={!quick.trim() || busy} onClick={() => persist({ ...EMPTY, title: quick.slice(0, 55), content: quick })}>Guardar</button></div>
+        {filtersOpen && <div className="notes-filters-panel">
         <div className="notes-toolbar"><label><Search size={18} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por título, contenido o etiqueta..." /></label><select value={type} onChange={e => setType(e.target.value)}><option value="all">Todos los tipos</option><option value="quick">Nota rápida</option><option value="pending">Pendiente</option><option value="idea">Idea</option><option value="log">Bitácora</option></select><select value={priority} onChange={e => setPriority(e.target.value)}><option value="all">Todas las prioridades</option><option value="alta">Alta</option><option value="media">Media</option><option value="baja">Baja</option></select><select value={sort} onChange={e => setSort(e.target.value)}><option value="updated-desc">Más recientes</option><option value="updated-asc">Más antiguas</option><option value="priority-desc">Prioridad alta</option><option value="due-asc">Fecha límite</option><option value="title-asc">Título A-Z</option></select>{isAdmin && <select value={ownerFilter} onChange={e => setOwnerFilter(e.target.value)}><option value="all">Todo el equipo</option>{owners.map(owner => <option key={owner.uid} value={owner.uid}>{owner.name}</option>)}</select>}{isAdmin && <label className="deleted-toggle"><input type="checkbox" checked={showDeleted} onChange={e => setShowDeleted(e.target.checked)} /> Ver eliminadas</label>}</div>
         <div className="notes-summary"><article><small>Total notas</small><strong>{notes.length}</strong></article><article><small>Pendientes</small><strong>{counts.pending}</strong></article><article><small>Ideas</small><strong>{counts.ideas}</strong></article><article><small>Archivadas</small><strong>{counts.archived}</strong></article></div>
-        <div className="notes-utility"><button onClick={exportNotes}><Download size={16} /> Exportar respaldo</button><button onClick={() => importRef.current?.click()}><Upload size={16} /> Importar respaldo</button><input ref={importRef} hidden type="file" accept=".json,application/json" onChange={importNotes} /></div>
+        <div className="notes-utility"><label className="deleted-toggle"><input type="checkbox" checked={corkboard} onChange={e => updatePref({ corkboard: e.target.checked })} /> Fondo de corcho</label><button onClick={exportNotes}><Download size={16} /> Exportar respaldo</button><button onClick={() => importRef.current?.click()}><Upload size={16} /> Importar respaldo</button><input ref={importRef} hidden type="file" accept=".json,application/json" onChange={importNotes} /></div>
+        </div>}
         {error && <p className="notes-error">{error}</p>}
         <div className="notes-section-head"><div><small>Tablero</small><h2>{VIEWS.find(item => item[0] === view)?.[1]}</h2></div></div>
         {visible.length ? <div className="postit-grid">{visible.map(note => <article key={note.id} className={`postit ${note.type} priority-${note.priority} ${note.deleted ? 'deleted' : ''}`} onClick={() => !note.deleted && setDraft({ ...EMPTY, ...note })}><div className="postit-top"><span>{typeLabel(note.type)}</span>{note.pinned && <b>Fijada</b>}</div>{isAdmin && <div className="postit-owner">{note.ownerName || note.ownerEmail}</div>}<h3>{note.title}</h3>{note.category && <small>{note.category}</small>}<p>{note.content}</p>{note.checklist?.length > 0 && <em>{note.checklist.length} tareas en checklist</em>}<div className="postit-tags">{note.tags?.map(tag => <span key={tag}>#{tag}</span>)}</div>{note.deleted && <strong>Eliminada por {note.deletedByName || 'usuario'}</strong>}<footer><span>{note.dueDate || 'Sin fecha límite'}</span>{!note.deleted && <div><button title="Archivar" onClick={e => { e.stopPropagation(); persist({ ...note, archived: !note.archived }); }}><Archive size={15} /></button><button title="Duplicar" onClick={e => { e.stopPropagation(); persist({ ...note, id: undefined, ownerUid: undefined, ownerEmail: undefined, ownerName: undefined, title: `${note.title} (copia)`, pinned: false }); }}><Copy size={15} /></button></div>}</footer></article>)}</div> : <div className="notes-empty"><StickyNote size={42} /><h3>No hay notas aquí</h3><p>Crea un post-it para empezar tu bitácora.</p><button className="notes-primary" onClick={() => setDraft({ ...EMPTY })}>Crear primera nota</button></div>}

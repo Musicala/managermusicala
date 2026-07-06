@@ -77,11 +77,13 @@ export function listenWorkNotePreferences(userUid, callback) {
 }
 
 export function saveWorkNotePreferences(userUid, preferences) {
-  return setDoc(appDoc(db, 'workNotePreferences', userUid), {
-    ownerUid: userUid,
-    theme: ['violeta', 'azul', 'magenta', 'verde'].includes(preferences.theme) ? preferences.theme : 'violeta',
-    updatedAt: serverTimestamp()
-  }, { merge: true });
+  const payload = { ownerUid: userUid, updatedAt: serverTimestamp() };
+  if (preferences.theme !== undefined) payload.theme = ['violeta', 'azul', 'magenta', 'verde'].includes(preferences.theme) ? preferences.theme : 'violeta';
+  if (preferences.density !== undefined) payload.density = preferences.density === 'compact' ? 'compact' : 'cozy';
+  if (preferences.sidebarOpen !== undefined) payload.sidebarOpen = Boolean(preferences.sidebarOpen);
+  if (preferences.filtersOpen !== undefined) payload.filtersOpen = Boolean(preferences.filtersOpen);
+  if (preferences.corkboard !== undefined) payload.corkboard = Boolean(preferences.corkboard);
+  return setDoc(appDoc(db, 'workNotePreferences', userUid), payload, { merge: true });
 }
 
 function toMillis(value) {
