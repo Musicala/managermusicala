@@ -425,6 +425,23 @@ input:focus, select:focus, textarea:focus { border-color: var(--vivaldi); backgr
 .locker-card.free .locker-name { color: var(--muted); font-weight: 500; }
 .locker-card.hit { outline: 2px solid var(--vivaldi); outline-offset: 2px; }
 .lockers-modal input { width: 100%; }
+.locker-card.teacher { border-color: rgba(255,150,10,.45); background: rgba(255,150,10,.06); }
+.locker-role-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  width: fit-content; padding: 2px 9px; border-radius: 999px;
+  font-size: 11px; font-weight: 700;
+}
+.locker-role-badge.estudiante { background: rgba(87,41,255,.12); color: rgb(87,41,255); }
+.locker-role-badge.docente { background: rgba(255,150,10,.16); color: rgb(190,105,0); }
+.locker-role-picker { display: flex; gap: 8px; }
+.locker-role-option {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 999px; cursor: pointer;
+  border: 1.5px solid var(--line); background: #fff;
+  font-size: 13px; font-weight: 600; color: var(--muted); transition: .15s ease;
+}
+.locker-role-option.estudiante.active { background: rgba(87,41,255,.12); border-color: rgba(87,41,255,.4); color: rgb(87,41,255); }
+.locker-role-option.docente.active { background: rgba(255,150,10,.16); border-color: rgba(255,150,10,.5); color: rgb(190,105,0); }
 .parking-section { display: grid; gap: 12px; }
 .parking-title { display: flex; align-items: center; gap: 8px; margin: 4px 0 0; font-size: 15px; color: var(--muted); }
 .locker-card .parking-meta { font-size: 12px; color: var(--muted); font-weight: 600; }

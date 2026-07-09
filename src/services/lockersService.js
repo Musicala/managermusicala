@@ -9,6 +9,13 @@ import { normalizeKey, normalizeText } from '../utils/normalize';
 
 export const LOCKER_COUNT = 16;
 
+export const LOCKER_ROLES = [
+  { id: 'estudiante', label: 'Estudiante' },
+  { id: 'docente', label: 'Docente' }
+];
+
+const normalizeRole = value => (value === 'docente' ? 'docente' : 'estudiante');
+
 const lockerId = number => `locker-${number}`;
 
 // Lista base de 16 candados, vacíos por defecto.
@@ -17,6 +24,7 @@ function defaultLockers() {
     id: lockerId(index + 1),
     number: index + 1,
     name: '',
+    role: 'estudiante',
     updatedAt: null,
     updatedBy: ''
   }));
@@ -34,6 +42,7 @@ export function listenLockers(callback) {
       return {
         ...base,
         name: normalizeText(data.name || ''),
+        role: normalizeRole(data.role),
         updatedAt: data.updatedAt || null,
         updatedBy: normalizeText(data.updatedBy || '')
       };
@@ -44,7 +53,7 @@ export function listenLockers(callback) {
 
 // Asigna un nombre a un candado concreto. Usa transacción para revisar
 // duplicados sobre el estado real (varios dispositivos a la vez).
-export async function assignLocker(number, rawName, actorName = '') {
+export async function assignLocker(number, rawName, actorName = '', role = 'estudiante') {
   if (!db) throw new Error('Firebase no está disponible.');
   const name = normalizeText(rawName);
   if (!name) throw new Error('Escribe un nombre.');
@@ -65,6 +74,7 @@ export async function assignLocker(number, rawName, actorName = '') {
     tx.set(targetRef, {
       number,
       name,
+      role: normalizeRole(role),
       updatedAt: serverTimestamp(),
       updatedBy: normalizeText(actorName)
     }, { merge: true });
@@ -79,6 +89,7 @@ export async function releaseLocker(number, actorName = '') {
     tx.set(ref, {
       number,
       name: '',
+      role: 'estudiante',
       updatedAt: serverTimestamp(),
       updatedBy: normalizeText(actorName)
     }, { merge: true });
@@ -86,7 +97,7 @@ export async function releaseLocker(number, actorName = '') {
 }
 
 // Asigna el primer candado libre, a prueba de concurrencia.
-export async function assignNextFree(rawName, actorName = '') {
+export async function assignNextFree(rawName, actorName = '', role = 'estudiante') {
   if (!db) throw new Error('Firebase no está disponible.');
   const name = normalizeText(rawName);
   if (!name) throw new Error('Escribe un nombre.');
@@ -106,6 +117,7 @@ export async function assignNextFree(rawName, actorName = '') {
     tx.set(refs[freeIndex], {
       number,
       name,
+      role: normalizeRole(role),
       updatedAt: serverTimestamp(),
       updatedBy: normalizeText(actorName)
     }, { merge: true });
