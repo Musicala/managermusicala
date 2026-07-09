@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { GraduationCap, Lock, LockOpen, Search, Sparkles, User, X } from 'lucide-react';
+import { Briefcase, GraduationCap, Lock, LockOpen, Search, Sparkles, User, UserRound, X } from 'lucide-react';
 import {
   assignLocker,
   assignNextFree,
@@ -8,21 +8,36 @@ import {
 } from '../services/lockersService';
 import { normalizeKey, normalizeText } from '../utils/normalize';
 
+const ROLE_ICONS = {
+  administrativo: Briefcase,
+  docente: GraduationCap,
+  estudiante: User,
+  visitante: UserRound
+};
+
+function roleMeta(id) {
+  const role = LOCKER_ROLES.find(r => r.id === id) || LOCKER_ROLES.find(r => r.id === 'estudiante');
+  return { ...role, Icon: ROLE_ICONS[role.id] || User };
+}
+
 function RolePicker({ value, onChange, disabled }) {
   return (
     <div className="locker-role-picker">
-      {LOCKER_ROLES.map(role => (
-        <button
-          key={role.id}
-          type="button"
-          className={`locker-role-option ${role.id} ${value === role.id ? 'active' : ''}`}
-          onClick={() => onChange(role.id)}
-          disabled={disabled}
-        >
-          {role.id === 'docente' ? <GraduationCap size={14} /> : <User size={14} />}
-          {role.label}
-        </button>
-      ))}
+      {LOCKER_ROLES.map(role => {
+        const Icon = ROLE_ICONS[role.id] || User;
+        return (
+          <button
+            key={role.id}
+            type="button"
+            className={`locker-role-option ${role.id} ${value === role.id ? 'active' : ''}`}
+            onClick={() => onChange(role.id)}
+            disabled={disabled}
+          >
+            <Icon size={14} />
+            {role.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -37,19 +52,21 @@ export default function LockersManager({ lockers, currentUserName, canManage }) 
   const [message, setMessage] = useState('');
 
   const query = normalizeKey(search);
-  const occupiedCount = useMemo(
-    () => lockers.filter(l => normalizeText(l.name)).length,
-    [lockers]
-  );
-  const teacherCount = useMemo(
-    () => lockers.filter(l => normalizeText(l.name) && l.role === 'docente').length,
-    [lockers]
-  );
+  const occupied = useMemo(() => lockers.filter(l => normalizeText(l.name)), [lockers]);
+  const roleCounts = useMemo(() => {
+    const counts = {};
+    occupied.forEach(l => { counts[l.role] = (counts[l.role] || 0) + 1; });
+    return counts;
+  }, [occupied]);
+  const roleSummary = LOCKER_ROLES
+    .filter(role => roleCounts[role.id])
+    .map(role => `${roleCounts[role.id]} ${role.label.toLowerCase()}${roleCounts[role.id] === 1 ? '' : 's'}`)
+    .join(' · ');
 
   function openLocker(locker) {
     setSelected(locker);
     setNameDraft(locker.name || '');
-    setRoleDraft(locker.role === 'docente' ? 'docente' : 'estudiante');
+    setRoleDraft(roleMeta(locker.role).id);
     setMessage('');
   }
 
@@ -117,7 +134,7 @@ export default function LockersManager({ lockers, currentUserName, canManage }) 
         <div>
           <h2>Candados</h2>
           <p className="muted">
-            {occupiedCount} de {lockers.length} ocupados · {teacherCount} docentes · {occupiedCount - teacherCount} estudiantes
+            {occupied.length} de {lockers.length} ocupados{roleSummary ? ` · ${roleSummary}` : ''}
           </p>
         </div>
       </div>
@@ -145,25 +162,25 @@ export default function LockersManager({ lockers, currentUserName, canManage }) 
 
       <div className="lockers-grid">
         {lockers.map(locker => {
-          const occupied = Boolean(normalizeText(locker.name));
+          const isOccupied = Boolean(normalizeText(locker.name));
           const hit = query && normalizeKey(locker.name).includes(query);
-          const isTeacher = occupied && locker.role === 'docente';
+          const role = roleMeta(locker.role);
           return (
             <button
               key={locker.id}
-              className={`locker-card ${occupied ? 'occupied' : 'free'} ${isTeacher ? 'teacher' : ''} ${hit ? 'hit' : ''}`}
+              className={`locker-card ${isOccupied ? `occupied role-${role.id}` : 'free'} ${hit ? 'hit' : ''}`}
               onClick={() => canManage && openLocker(locker)}
               disabled={!canManage}
             >
               <span className="locker-number">
-                {occupied ? <Lock size={16} /> : <LockOpen size={16} />}
+                {isOccupied ? <Lock size={16} /> : <LockOpen size={16} />}
                 Candado {locker.number}
               </span>
-              <span className="locker-name">{occupied ? locker.name : 'Disponible'}</span>
-              {occupied && (
-                <span className={`locker-role-badge ${isTeacher ? 'docente' : 'estudiante'}`}>
-                  {isTeacher ? <GraduationCap size={12} /> : <User size={12} />}
-                  {isTeacher ? 'Docente' : 'Estudiante'}
+              <span className="locker-name">{isOccupied ? locker.name : 'Disponible'}</span>
+              {isOccupied && (
+                <span className={`locker-role-badge ${role.id}`}>
+                  <role.Icon size={12} />
+                  {role.label}
                 </span>
               )}
             </button>

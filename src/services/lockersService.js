@@ -10,11 +10,14 @@ import { normalizeKey, normalizeText } from '../utils/normalize';
 export const LOCKER_COUNT = 16;
 
 export const LOCKER_ROLES = [
+  { id: 'administrativo', label: 'Administrativo' },
+  { id: 'docente', label: 'Docente' },
   { id: 'estudiante', label: 'Estudiante' },
-  { id: 'docente', label: 'Docente' }
+  { id: 'visitante', label: 'Visitante' }
 ];
 
-const normalizeRole = value => (value === 'docente' ? 'docente' : 'estudiante');
+const normalizeRole = value =>
+  LOCKER_ROLES.some(role => role.id === value) ? value : 'estudiante';
 
 const lockerId = number => `locker-${number}`;
 
