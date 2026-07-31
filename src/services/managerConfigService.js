@@ -1,4 +1,4 @@
-import { deleteDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
+import { deleteDoc, getDoc, getDocs, onSnapshot, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { appCollection, appDoc } from '../firebase/dbPaths';
 import { BUTTON_SECTION_OPTIONS, normalizeButtonSections } from '../utils/normalize';
@@ -111,7 +111,9 @@ export function listenTaskTemplates(callback) {
 export async function saveTaskTemplate(template) {
   if (!db) throw new Error('Firebase no esta disponible.');
   const id = template.id || String(template.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || `tarea-${Date.now()}`;
-  await setDoc(appDoc(db, 'taskTemplates', id), {
+  const templateRef = appDoc(db, 'taskTemplates', id);
+  const previous = template.id ? (await getDoc(templateRef)).data() : null;
+  const payload = {
     name: String(template.name || '').trim(),
     category: String(template.category || 'General').trim(),
     description: String(template.description || '').trim(),
@@ -129,7 +131,35 @@ export async function saveTaskTemplate(template) {
     active: template.active !== false,
     updatedAt: serverTimestamp(),
     createdAt: template.createdAt || serverTimestamp()
-  }, { merge: true });
+  };
+  await setDoc(templateRef, payload, { merge: true });
+
+  // Las tareas del horario son copias operativas: se mantienen sus horas,
+  // asistente, notas y color, pero el nombre/descripciÃ³n vienen de la bolsa.
+  // El nombre anterior permite enlazar registros creados antes de templateId.
+  if (template.id) {
+    const previousName = String(previous?.name || '').trim().toLowerCase();
+    const schedule = await getDocs(appCollection(db, 'schedule'));
+    const matches = schedule.docs.filter(item => {
+      const data = item.data();
+      return data.templateId === id
+        || (!data.templateId && previousName && String(data.task || '').trim().toLowerCase() === previousName);
+    });
+
+    for (let index = 0; index < matches.length; index += 450) {
+      const batch = writeBatch(db);
+      matches.slice(index, index + 450).forEach(item => {
+        batch.set(item.ref, {
+          templateId: id,
+          task: payload.name,
+          description: payload.description,
+          category: payload.category,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      });
+      await batch.commit();
+    }
+  }
   return id;
 }
 
