@@ -42,6 +42,7 @@ export function normalizeSchedulePayload(input) {
     assistantName: normalizeText(input.assistantName || input.asistente),
     assistantEmail: normalizeText(input.assistantEmail || input.correo || input.email).toLowerCase(),
     task: normalizeText(input.task || input.tarea),
+    templateId: normalizeText(input.templateId || input.tareaId),
     description: normalizeText(input.description || input.descripcion),
     note: normalizeText(input.note || input.nota),
     category: normalizeText(input.category || input.categoria || ''),
