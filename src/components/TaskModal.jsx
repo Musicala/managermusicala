@@ -25,6 +25,9 @@ export default function TaskModal({ task, assistants, templates = [], getJornada
     category: task?.category || '',
     color: task?.color || 'azul',
     scenario: task?.scenario || 'normal',
+    // Se conserva la fecha de la tarea: sin esto, editar una tarea de un dia
+    // concreto la convertia en tarea base y desaparecia de la semana.
+    scheduleDate: task?.scheduleDate || '',
     active: task?.active !== false
   });
   const [bagOpen, setBagOpen] = useState(Boolean(task?.openBag));
