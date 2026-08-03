@@ -274,6 +274,12 @@ service cloud.firestore {
         allow create, update, delete: if isManagerActiveAdmin();
       }
 
+      // Escalamientos y seguimientos: todo el equipo activo ve; admin y asistentes gestionan.
+      match /escalations/{escalationId} {
+        allow read: if isManagerActiveUser();
+        allow create, update, delete: if isManagerCertificateManager();
+      }
+
       // Candados (MusiLockers): todo el equipo activo ve; admin y asistentes gestionan.
       match /lockers/{lockerId} {
         allow read: if isManagerActiveUser();

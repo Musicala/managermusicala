@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CalendarDays, Download, Eye, FileCheck2, Grid3X3, Lock, LogOut, ParkingSquare, Search, Settings, Users, X } from 'lucide-react';
+import { AlertTriangle, CalendarDays, Download, Eye, FileCheck2, Grid3X3, LifeBuoy, Lock, LogOut, ParkingSquare, Search, Settings, Users, X } from 'lucide-react';
 import { firebaseReady } from './firebase/firebase';
 import { ensureCurrentUserProfile, listenAuth, logout } from './services/authService';
 import { listenButtons } from './services/buttonsService';
 import { listenSchedule, resolveScheduleForCurrentWeek } from './services/scheduleService';
 import { listenUsers } from './services/usersService';
 import { listenCertificates } from './services/certificatesService';
+import { listenEscalations, OPEN_ESCALATION_STATUSES } from './services/escalationsService';
 import { listenLockers } from './services/lockersService';
 import { listenParking } from './services/parkingService';
 import { DEFAULT_MANAGER_SETTINGS, listenManagerSettings } from './services/managerConfigService';
@@ -20,6 +21,7 @@ import UsersAdmin from './components/UsersAdmin';
 import DataManager from './components/DataManager';
 import ManagerSettings from './components/ManagerSettings';
 import CertificatesManager from './components/CertificatesManager';
+import EscalationsManager from './components/EscalationsManager';
 import LockersManager from './components/LockersManager';
 import ParkingManager from './components/ParkingManager';
 import WorkNotes from './components/WorkNotes';
@@ -28,6 +30,7 @@ const NAV_ITEMS = [
   { id: 'tools', label: 'Herramientas', icon: Grid3X3, roles: ['*'] },
   { id: 'my-schedule', label: 'Mi horario', icon: CalendarDays, roles: ['asistente'] },
   { id: 'admin-schedule', label: 'Gestionar horario', icon: CalendarDays, roles: ['admin'] },
+  { id: 'escalations', label: 'Escalamientos', icon: LifeBuoy, roles: ['admin', 'asistente'] },
   { id: 'certificates', label: 'Certificados', icon: FileCheck2, roles: ['admin', 'asistente'] },
   { id: 'lockers', label: 'MusiLockers', icon: Lock, roles: ['admin', 'asistente'] },
   { id: 'parking', label: 'Parqueadero', icon: ParkingSquare, roles: ['admin', 'asistente'] },
@@ -46,6 +49,7 @@ export default function App() {
   const [schedule, setSchedule] = useState([]);
   const [users, setUsers] = useState([]);
   const [certificates, setCertificates] = useState([]);
+  const [escalations, setEscalations] = useState([]);
   const [lockers, setLockers] = useState([]);
   const [parking, setParking] = useState([]);
   const [activeView, setActiveView] = useState('tools');
@@ -89,6 +93,7 @@ export default function App() {
     const unsubSchedule = listenSchedule(setSchedule);
     const unsubUsers = isAdmin ? listenUsers(setUsers) : () => {};
     const unsubCertificates = listenCertificates(setCertificates);
+    const unsubEscalations = listenEscalations(setEscalations);
     const unsubLockers = listenLockers(setLockers);
     const unsubParking = listenParking(setParking);
     const unsubSettings = listenManagerSettings(setManagerSettings);
@@ -97,6 +102,7 @@ export default function App() {
       unsubSchedule();
       unsubUsers();
       unsubCertificates();
+      unsubEscalations();
       unsubLockers();
       unsubParking();
       unsubSettings();
@@ -168,6 +174,9 @@ export default function App() {
   const pendingCertificatesCount = useMemo(() => {
     return certificates.filter(item => (item.status || 'pendiente') === 'pendiente').length;
   }, [certificates]);
+  const openEscalationsCount = useMemo(() => {
+    return escalations.filter(item => OPEN_ESCALATION_STATUSES.includes(item.status || 'abierto')).length;
+  }, [escalations]);
 
   if (!firebaseReady) return <ConfigMissing />;
   if (authLoading) return <LoadingScreen text="Cargando Musicala Manager..." />;
@@ -243,6 +252,9 @@ export default function App() {
                   {item.id === 'certificates' && pendingCertificatesCount > 0 && (
                     <span className="nav-badge">{pendingCertificatesCount}</span>
                   )}
+                  {item.id === 'escalations' && openEscalationsCount > 0 && (
+                    <span className="nav-badge">{openEscalationsCount}</span>
+                  )}
                 </button>
               );
             })}
@@ -288,6 +300,9 @@ export default function App() {
           {activeView === 'certificates' && canManageCertificates && (
             <CertificatesManager certificates={certificates} currentUserName={currentUserName} canManage={canManageCertificates} />
           )}
+          {activeView === 'escalations' && canManageCertificates && (
+            <EscalationsManager escalations={escalations} currentUserName={currentUserName} canManage={canManageCertificates} />
+          )}
           {activeView === 'lockers' && canManageCertificates && (
             <LockersManager lockers={lockers} currentUserName={currentUserName} canManage={canManageCertificates} />
           )}
@@ -309,6 +324,7 @@ function getViewTitle(view) {
     'work-notes': 'Notas de trabajo',
     'my-schedule': 'Mi horario',
     'admin-schedule': 'Gestion de horario',
+    escalations: 'Escalamientos y seguimientos',
     certificates: 'Certificados',
     lockers: 'MusiLockers',
     parking: 'Parqueadero',
