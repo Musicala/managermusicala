@@ -20,7 +20,6 @@ export default function TaskModal({ task, assistants, templates = [], getJornada
     assistantName: task?.assistantName || '',
     assistantEmail: task?.assistantEmail || '',
     task: task?.task || '',
-    templateId: task?.templateId || '',
     description: task?.description || '',
     note: task?.note || '',
     category: task?.category || '',
@@ -56,7 +55,6 @@ export default function TaskModal({ task, assistants, templates = [], getJornada
       return {
         ...current,
         task: template.name || '',
-        templateId: template.id || '',
         description: template.description || '',
         category: template.category || '',
         endTime: endTime || current.endTime
