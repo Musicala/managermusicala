@@ -44,7 +44,30 @@ export async function getUserProfile(uid) {
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
+// Errores que suelen ser pasajeros: justo despues de publicar reglas nuevas
+// Firestore puede negar lecturas durante unos segundos mientras propaga, y
+// tambien hay cortes breves de red. Reintentar evita que una de esas ventanas
+// deje al usuario encerrado en la pantalla de error.
+const RETRYABLE_CODES = ['permission-denied', 'unavailable', 'deadline-exceeded', 'internal'];
+const RETRY_DELAYS_MS = [1200, 2500, 5000];
+
 export async function ensureCurrentUserProfile(user) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      return await loadOrCreateProfile(user);
+    } catch (error) {
+      lastError = error;
+      if (!RETRYABLE_CODES.includes(error?.code)) throw error;
+      const delay = RETRY_DELAYS_MS[attempt];
+      if (delay === undefined) break;
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw lastError;
+}
+
+async function loadOrCreateProfile(user) {
   if (!db || !user) return null;
   const ref = appDoc(db, 'users', user.uid);
   const snap = await getDoc(ref);

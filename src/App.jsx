@@ -84,6 +84,21 @@ export default function App() {
     });
   }, []);
 
+  async function retryProfile() {
+    if (!authUser) return;
+    setAuthLoading(true);
+    setProfileError('');
+    try {
+      const ensured = await ensureCurrentUserProfile(authUser);
+      setBaseProfile(ensured);
+      setProfile(ensured);
+    } catch (error) {
+      setProfileError(error.message || 'No se pudo cargar el perfil.');
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
   const isAdmin = profile?.role === ROLES.ADMIN;
   const isActive = Boolean(profile?.active || isAdmin);
 
@@ -189,7 +204,13 @@ export default function App() {
           <AlertTriangle size={32} />
           <h1>No se pudo cargar tu perfil</h1>
           <p>{profileError}</p>
-          <button className="btn primary" onClick={logout}>Cerrar sesion</button>
+          <p className="muted">
+            Si acabas de publicar reglas nuevas, espera unos segundos y vuelve a intentar.
+          </p>
+          <div className="modal-actions">
+            <button className="btn ghost" onClick={logout}>Cerrar sesion</button>
+            <button className="btn primary" onClick={retryProfile}>Reintentar</button>
+          </div>
         </div>
       </div>
     );
