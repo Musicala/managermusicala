@@ -226,21 +226,42 @@ service cloud.firestore {
         allow create, update, delete: if isManagerCertificateManager();
       }
 
+      // ===== Nomina (proyecto de Cata) =====
+      // Estos bloques deben mantenerse identicos a los del repo de nomina:
+      // ambos proyectos despliegan sobre el mismo proyecto Firebase y el
+      // ultimo despliegue reemplaza el archivo completo. Si aqui faltan,
+      // nomina deja de funcionar; si alla faltan los de Manager, Manager
+      // deja de funcionar.
+
       // Novedades de nomina: cualquier cuenta Google puede crear y consultar.
-      // Una novedad creada solo puede cambiar de estado y registrar quien/cuando
-      // hizo el cambio; no se permite borrar el historial.
+      // El admin edita a fondo; el resto solo estado, descripcion,
+      // observaciones y las marcas de revision.
       match /novedades_nomina/{docId} {
         allow create, read: if googleUser();
-        allow update: if googleUser()
-          && request.resource.data.diff(resource.data).changedKeys()
-            .hasOnly(['estado', 'actualizadoPor', 'actualizadoEn']);
-        allow delete: if false;
+        allow update: if isAdmin()
+          || (googleUser()
+              && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+                'estado',
+                'descripcion',
+                'observaciones',
+                'actualizadoPor',
+                'actualizadoEn',
+                'revisadoPor'
+              ]));
+        allow delete: if isAdmin();
       }
 
       // Directorio de empleados usado por el flujo de nomina de Cata.
+      // La pestana Equipo ya esta limitada a administradores por la app.
       match /empleados/{docId} {
         allow create, read, update: if googleUser();
-        allow delete: if false;
+        allow delete: if googleUser();
+      }
+
+      // Nomina mensual guardada (dias, novedades, prestaciones).
+      match /nomina_mensual/{periodo} {
+        allow read: if signedIn();
+        allow create, update, delete: if googleUser();
       }
 
       // Notas personales del equipo. Cada usuario gestiona las suyas; los
@@ -290,6 +311,15 @@ service cloud.firestore {
       match /parking/{spotId} {
         allow read: if isManagerActiveUser();
         allow create, update, delete: if isManagerCertificateManager();
+      }
+
+      // Comodin heredado del archivo de nomina. Se conserva tal cual estaba
+      // desplegado para no romper esa app. Solo concede lectura: las reglas
+      // de escritura de arriba siguen mandando (las reglas se evaluan en OR,
+      // asi que este "write: if false" no bloquea nada).
+      match /{document=**} {
+        allow read: if googleUser();
+        allow write: if false;
       }
     }
 
