@@ -140,6 +140,12 @@ input:focus, select:focus, textarea:focus { border-color: var(--vivaldi); backgr
 .timeline-card strong, .timeline-card span, .timeline-card small, .timeline-card em { display: block; }
 .timeline-card span, .timeline-card small, .timeline-card em { font-size: .76rem; opacity: .82; }
 .timeline-card em { position: absolute; right: 8px; bottom: 6px; font-style: normal; font-weight: 800; background: rgba(255,255,255,.85); border-radius: 999px; padding: 1px 7px; font-size: .72rem; }
+/* Las tarjetas de 30 min o menos son muy bajas: se compacta el contenido para
+   que el titulo y la hora compartan renglon y la descripcion alcance a verse. */
+.timeline-card.compact { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 6px; align-content: center; padding: 5px 10px; padding-right: 58px; }
+.timeline-card.compact strong { font-size: .82rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.timeline-card.compact span { font-size: .72rem; line-height: 1.2; white-space: nowrap; align-self: center; }
+.timeline-card.compact small { grid-column: 1 / -1; font-size: .7rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .timeline-card.draggable { cursor: grab; touch-action: none; }
 .timeline-card.draggable:active { cursor: grabbing; }
 .timeline-card.dragging { z-index: 20; opacity: .9; box-shadow: 0 12px 28px rgba(76, 29, 149, .28); transition: none; }

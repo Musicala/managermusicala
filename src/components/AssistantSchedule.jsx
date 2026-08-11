@@ -186,7 +186,7 @@ export function TimelineCard({ item, onClick, onMove, layout, conflict = false }
 
   return (
     <button
-      className={`timeline-card color-${item.color || (isBreak ? 'verde' : 'azul')} ${isBreak ? 'break-card' : ''} ${conflict ? 'conflict' : ''} ${onMove ? 'draggable' : ''} ${dragPreview ? 'dragging' : ''}`}
+      className={`timeline-card color-${item.color || (isBreak ? 'verde' : 'azul')} ${isBreak ? 'break-card' : ''} ${!isBreak && minutes <= 30 ? 'compact' : ''} ${conflict ? 'conflict' : ''} ${onMove ? 'draggable' : ''} ${dragPreview ? 'dragging' : ''}`}
       style={cardStyle}
       onClick={event => {
         if (suppressClickRef.current) {
@@ -203,7 +203,7 @@ export function TimelineCard({ item, onClick, onMove, layout, conflict = false }
     >
       <strong>{isBreak ? `${item.task} · ${item.startTime}` : item.task}</strong>
       {!isBreak && <span>{shownStart}{shownEnd ? ` - ${shownEnd}` : ''}</span>}
-      {!isBreak && item.description && <small>{item.description}</small>}
+      {!isBreak && item.description && <small title={item.description}>{item.description}</small>}
       {minutes > 0 && !isBreak && <em>{minutes} min</em>}
     </button>
   );
