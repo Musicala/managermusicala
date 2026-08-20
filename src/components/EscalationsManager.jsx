@@ -46,9 +46,14 @@ const PRIORITY_CLASS = {
   baja: 'low'
 };
 
+const STATUS_ORDER = ESCALATION_STATUSES.reduce((order, status, index) => {
+  order[status.value] = index;
+  return order;
+}, {});
+
 export default function EscalationsManager({ escalations, currentUserName, canManage }) {
   const [draft, setDraft] = useState(EMPTY_ESCALATION);
-  const [filters, setFilters] = useState({ search: '', type: '', status: '', priority: '' });
+  const [filters, setFilters] = useState({ search: '', type: '', status: '', priority: '', sort: 'recent' });
   const [selected, setSelected] = useState(null);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -71,7 +76,7 @@ export default function EscalationsManager({ escalations, currentUserName, canMa
 
   const filteredEscalations = useMemo(() => {
     const query = normalizeKey(filters.search);
-    return escalations.filter(item => {
+    const rows = escalations.filter(item => {
       const haystack = normalizeKey(
         `${item.title} ${item.personName} ${item.studentName} ${typeLabel(item)} ${item.description} ${item.assignedTo}`
       );
@@ -82,6 +87,12 @@ export default function EscalationsManager({ escalations, currentUserName, canMa
         : !filters.status || item.status === filters.status;
       const matchesPriority = !filters.priority || item.priority === filters.priority;
       return matchesSearch && matchesType && matchesStatus && matchesPriority;
+    });
+    if (filters.sort !== 'status') return rows;
+    return [...rows].sort((a, b) => {
+      const statusDiff = (STATUS_ORDER[a.status || 'abierto'] ?? Number.MAX_SAFE_INTEGER)
+        - (STATUS_ORDER[b.status || 'abierto'] ?? Number.MAX_SAFE_INTEGER);
+      return statusDiff || dateMillis(b.reportedAt) - dateMillis(a.reportedAt);
     });
   }, [escalations, filters]);
 
@@ -232,6 +243,13 @@ export default function EscalationsManager({ escalations, currentUserName, canMa
             <select value={filters.priority} onChange={e => setFilters(current => ({ ...current, priority: e.target.value }))}>
               <option value="">Todas</option>
               {ESCALATION_PRIORITIES.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Organizar por</span>
+            <select value={filters.sort} onChange={e => setFilters(current => ({ ...current, sort: e.target.value }))}>
+              <option value="recent">Fecha más reciente</option>
+              <option value="status">Estado</option>
             </select>
           </label>
         </div>

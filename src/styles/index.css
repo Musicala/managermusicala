@@ -365,7 +365,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--vivaldi); backgr
 .empty-table { text-align: center; color: var(--muted); font-weight: 700; }
 .escalation-card.waiting svg { color: #7c3aed; }
 .escalation-card.overdue svg { color: #dc2626; }
-.escalation-filters { display: grid; grid-template-columns: minmax(240px, 1.4fr) repeat(3, minmax(150px, .8fr)); gap: 14px; align-items: end; padding: 18px 22px 0; }
+.escalation-filters { display: grid; grid-template-columns: minmax(240px, 1.4fr) repeat(4, minmax(150px, .8fr)); gap: 14px; align-items: end; padding: 18px 22px 0; }
 .escalation-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; }
 .span-3 { grid-column: span 3; }
 .escalation-table { min-width: 1120px; }
