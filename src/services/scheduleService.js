@@ -1,8 +1,11 @@
 import {
   deleteDoc,
+  getDocs,
   onSnapshot,
+  query,
   serverTimestamp,
   setDoc,
+  where,
   writeBatch
 } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
@@ -110,6 +113,34 @@ export async function saveScheduleTask(input) {
     updatedAt: serverTimestamp()
   }, { merge: true });
   return id;
+}
+
+// Conserva el vínculo de horarios antiguos cuando cambia el nombre visible de
+// una asistente. Algunas tareas históricas solo guardan el nombre, mientras
+// que las nuevas guardan también su correo.
+export async function renameAssistantScheduleAssignments({ previousName, email, displayName }) {
+  if (!db) throw new Error('Firebase no está disponible.');
+  const oldName = normalizeText(previousName);
+  const nextName = normalizeText(displayName);
+  const assistantEmail = normalizeText(email).toLowerCase();
+  if (!nextName || nextName === oldName) return 0;
+
+  const snapshots = await Promise.all([
+    oldName ? getDocs(query(appCollection(db, 'schedule'), where('assistantName', '==', oldName))) : Promise.resolve(null),
+    assistantEmail ? getDocs(query(appCollection(db, 'schedule'), where('assistantEmail', '==', assistantEmail))) : Promise.resolve(null)
+  ]);
+  const tasks = new Map();
+  snapshots.filter(Boolean).forEach(snapshot => snapshot.docs.forEach(doc => tasks.set(doc.id, doc)));
+
+  const docs = Array.from(tasks.values());
+  for (let index = 0; index < docs.length; index += 450) {
+    const batch = writeBatch(db);
+    docs.slice(index, index + 450).forEach(doc => {
+      batch.set(doc.ref, { assistantName: nextName, updatedAt: serverTimestamp() }, { merge: true });
+    });
+    await batch.commit();
+  }
+  return docs.length;
 }
 
 export async function shiftScheduleTasks(tasks, offsetMinutes) {

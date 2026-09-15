@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Check, CheckCheck, FlipHorizontal2, Save, Search, Star, Trash2, UserPlus, X } from 'lucide-react';
 import { deleteUserProfile, updateUserProfile } from '../services/usersService';
 import { saveAssistantInvite } from '../services/assistantAccountsService';
+import { renameAssistantScheduleAssignments } from '../services/scheduleService';
 import { ROLES, normalizeButtonSection, normalizeText } from '../utils/normalize';
 
 export default function UsersAdmin({ users, buttons }) {
@@ -68,11 +69,20 @@ export default function UsersAdmin({ users, buttons }) {
 
   async function save(user) {
     const draft = getDraft(user);
+    const previousName = normalizeText(user.displayName || user.username || user.email);
+    const nextName = normalizeText(draft.displayName);
     setSavingId(user.id);
     setMessage('');
     try {
+      const renamedTasks = await renameAssistantScheduleAssignments({
+        previousName,
+        email: user.email,
+        displayName: nextName
+      });
       await updateUserProfile(user.id, draft);
-      setMessage('Usuario actualizado. Increíble, un permiso que no vive en una hoja perdida.');
+      setMessage(renamedTasks
+        ? `Usuario actualizado y ${renamedTasks} tareas del horario conservaron su nueva asignación.`
+        : 'Usuario actualizado. Increíble, un permiso que no vive en una hoja perdida.');
     } catch (error) {
       setMessage(error.message || 'No se pudo actualizar el usuario.');
     } finally {
