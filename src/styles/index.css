@@ -264,6 +264,10 @@ input:focus, select:focus, textarea:focus { border-color: var(--vivaldi); backgr
 .emoji-picker button.selected, .emoji-picker button:hover { border-color: var(--vivaldi); background: #f5f3ff; }
 .access-toolbar { margin: 18px 22px 0; display: flex; align-items: center; gap: 10px; max-width: 460px; color: var(--muted); }
 .access-toolbar input { background: #fff; }
+.assistant-quick-add { margin: 0 28px 18px; padding: 16px; display: grid; grid-template-columns: minmax(190px, 1fr) minmax(150px, 1fr) minmax(190px, 1.25fr) auto; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 14px; background: #fafbff; }
+.assistant-quick-add strong { display: block; color: var(--ink); }
+.assistant-quick-add .muted { margin: 3px 0 0; font-size: .84rem; }
+.assistant-quick-add input { min-width: 0; }
 .settings-grid { display: grid; gap: 18px; }
 .settings-body { padding: 18px 22px 22px; display: grid; gap: 16px; }
 .template-fields { grid-template-columns: 1.6fr 1fr 1fr 120px; align-items: end; }
@@ -407,7 +411,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--vivaldi); backgr
   .brand-block, .topbar-right { width: auto; }
   .search-wrap { order: 3; width: 100%; }
   .widget-grid { grid-template-columns: 1fr; }
-  .form-grid.button-fields, .import-box, .template-fields, .assistant-account-fields, .message-fields { grid-template-columns: 1fr; }
+  .form-grid.button-fields, .import-box, .template-fields, .assistant-account-fields, .message-fields, .assistant-quick-add { grid-template-columns: 1fr; }
+  .assistant-quick-add { margin: 0 18px 18px; }
   .assistant-account-row { grid-template-columns: 1fr; }
 }
 

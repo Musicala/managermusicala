@@ -537,7 +537,7 @@ export default function ManagerSettings({ users = [] }) {
             </label>
             <label>
               <span>Nombre visible</span>
-              <input value={assistantDraft.displayName} onChange={e => setAssistantDraft(current => ({ ...current, displayName: e.target.value }))} placeholder="Camila Rodríguez" />
+              <input value={assistantDraft.displayName} onChange={e => setAssistantDraft(current => ({ ...current, displayName: e.target.value }))} placeholder="Nombre de la asistente" />
             </label>
             <label>
               <span>Área / rol</span>

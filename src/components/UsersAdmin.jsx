@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Check, CheckCheck, FlipHorizontal2, Save, Search, Star, Trash2, X } from 'lucide-react';
+import { Check, CheckCheck, FlipHorizontal2, Save, Search, Star, Trash2, UserPlus, X } from 'lucide-react';
 import { deleteUserProfile, updateUserProfile } from '../services/usersService';
+import { saveAssistantInvite } from '../services/assistantAccountsService';
 import { ROLES, normalizeButtonSection, normalizeText } from '../utils/normalize';
 
 export default function UsersAdmin({ users, buttons }) {
@@ -8,6 +9,8 @@ export default function UsersAdmin({ users, buttons }) {
   const [savingId, setSavingId] = useState('');
   const [message, setMessage] = useState('');
   const [buttonSearch, setButtonSearch] = useState('');
+  const [newAssistant, setNewAssistant] = useState({ displayName: '', email: '' });
+  const [creatingAssistant, setCreatingAssistant] = useState(false);
 
   const activeButtons = useMemo(() => buttons.filter(button => button.active !== false), [buttons]);
 
@@ -93,6 +96,32 @@ export default function UsersAdmin({ users, buttons }) {
     }
   }
 
+  async function addAssistant(event) {
+    event.preventDefault();
+    const email = normalizeText(newAssistant.email).toLowerCase();
+    const displayName = normalizeText(newAssistant.displayName);
+    if (!email || !displayName) {
+      setMessage('Escribe el nombre y correo de la asistente.');
+      return;
+    }
+    setCreatingAssistant(true);
+    setMessage('');
+    try {
+      await saveAssistantInvite({
+        email,
+        displayName,
+        active: true,
+        buttonAccess: []
+      });
+      setNewAssistant({ displayName: '', email: '' });
+      setMessage('Asistente agregada. Ahora puedes asignarle botones abajo; al entrar con ese correo tendrá acceso directo.');
+    } catch (error) {
+      setMessage(error.message || 'No se pudo agregar la asistente.');
+    } finally {
+      setCreatingAssistant(false);
+    }
+  }
+
   function accessTokens(draft) {
     return draft.buttonAccess.split(/[,;\n]+/).map(normalizeText).filter(Boolean);
   }
@@ -173,6 +202,29 @@ export default function UsersAdmin({ users, buttons }) {
       </div>
 
       {message && <div className="info-banner">{message}</div>}
+
+      <form className="assistant-quick-add" onSubmit={addAssistant}>
+        <div>
+          <strong>Agregar asistente</strong>
+          <p className="muted">Crea su acceso por correo y asigna sus botones desde esta misma pantalla.</p>
+        </div>
+        <input
+          value={newAssistant.displayName}
+          onChange={e => setNewAssistant(current => ({ ...current, displayName: e.target.value }))}
+          placeholder="Nombre completo"
+          aria-label="Nombre de la asistente"
+        />
+        <input
+          type="email"
+          value={newAssistant.email}
+          onChange={e => setNewAssistant(current => ({ ...current, email: e.target.value }))}
+          placeholder="correo@musicala.com"
+          aria-label="Correo de la asistente"
+        />
+        <button className="btn primary" disabled={creatingAssistant}>
+          <UserPlus size={17} /> {creatingAssistant ? 'Agregando...' : 'Agregar'}
+        </button>
+      </form>
 
       <div className="access-toolbar">
         <Search size={18} />
