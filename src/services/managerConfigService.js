@@ -1,7 +1,7 @@
 import { deleteDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { appCollection, appDoc } from '../firebase/dbPaths';
-import { BUTTON_SECTION_OPTIONS, normalizeButtonSections } from '../utils/normalize';
+import { BUTTON_SECTION_OPTIONS, normalizeButtonSections, normalizeKey, normalizeText } from '../utils/normalize';
 
 export const DEFAULT_MANAGER_SETTINGS = {
   notificationsEnabled: true,
@@ -22,6 +22,7 @@ export const DEFAULT_MANAGER_SETTINGS = {
     { id: 'redistribuido', name: 'Horario redistribuido' },
     { id: 'vacacional', name: 'Horario vacacional' }
   ],
+  escalationResponsibles: [],
   buttonSections: BUTTON_SECTION_OPTIONS,
   notificationMessages: [
     {
@@ -77,6 +78,18 @@ export function mergeDefaultNotificationMessages(messages = []) {
   return [...savedMessages, ...missingDefaults];
 }
 
+export function normalizeEscalationResponsibles(value) {
+  const seen = new Set();
+  return (Array.isArray(value) ? value : [])
+    .map(normalizeText)
+    .filter(name => {
+      const key = normalizeKey(name);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
 export function listenManagerSettings(callback) {
   if (!db) return () => {};
   return onSnapshot(appDoc(db, 'managerSettings', 'general'), snap => {
@@ -85,6 +98,7 @@ export function listenManagerSettings(callback) {
       ...DEFAULT_MANAGER_SETTINGS,
       ...data,
       buttonSections: normalizeButtonSections(data.buttonSections),
+      escalationResponsibles: normalizeEscalationResponsibles(data.escalationResponsibles),
       notificationMessages: mergeDefaultNotificationMessages(data.notificationMessages)
     });
   });
@@ -95,6 +109,7 @@ export async function saveManagerSettings(settings) {
   await setDoc(appDoc(db, 'managerSettings', 'general'), {
     ...settings,
     buttonSections: normalizeButtonSections(settings.buttonSections),
+    escalationResponsibles: normalizeEscalationResponsibles(settings.escalationResponsibles),
     updatedAt: serverTimestamp()
   }, { merge: true });
 }

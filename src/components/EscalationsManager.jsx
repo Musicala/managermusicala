@@ -51,13 +51,30 @@ const STATUS_ORDER = ESCALATION_STATUSES.reduce((order, status, index) => {
   return order;
 }, {});
 
-export default function EscalationsManager({ escalations, currentUserName, canManage }) {
+export default function EscalationsManager({ escalations, users = [], settings = {}, currentUserName, canManage }) {
   const [draft, setDraft] = useState(EMPTY_ESCALATION);
   const [filters, setFilters] = useState({ search: '', type: '', status: '', priority: '', sort: 'recent' });
   const [selected, setSelected] = useState(null);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+
+  const responsibleOptions = useMemo(() => {
+    const names = [
+      ...(Array.isArray(settings.escalationResponsibles) ? settings.escalationResponsibles : []),
+      ...users
+        .filter(user => user.active !== false)
+        .filter(user => ['admin', 'asistente'].includes(user.role))
+        .map(user => user.displayName || user.username || user.email),
+      currentUserName
+    ].map(normalizeText).filter(Boolean);
+    const unique = new Map();
+    names.forEach(name => {
+      const key = normalizeKey(name);
+      if (!unique.has(key)) unique.set(key, name);
+    });
+    return Array.from(unique.values()).sort((a, b) => a.localeCompare(b, 'es'));
+  }, [settings.escalationResponsibles, users, currentUserName]);
 
   const selectedCase = useMemo(() => {
     if (!selected) return null;
@@ -260,6 +277,7 @@ export default function EscalationsManager({ escalations, currentUserName, canMa
               <EscalationFields
                 value={draft}
                 onChange={(field, value) => setDraft(current => ({ ...current, [field]: value }))}
+                responsibleOptions={responsibleOptions}
                 compact
               />
             </div>
@@ -356,6 +374,7 @@ export default function EscalationsManager({ escalations, currentUserName, canMa
           onClose={() => { setSelected(null); setEditing(null); }}
           onSave={handleSaveEdit}
           onEditChange={(field, value) => setEditing(current => ({ ...current, [field]: value }))}
+          responsibleOptions={responsibleOptions}
           onFollowUp={handleFollowUp}
           canManage={canManage}
           saving={saving}
@@ -377,7 +396,7 @@ function SummaryCard({ label, value, tone }) {
   );
 }
 
-function EscalationFields({ value, onChange, compact = false }) {
+function EscalationFields({ value, onChange, responsibleOptions = [], compact = false }) {
   return (
     <>
       <label className={compact ? 'span-2' : ''}>
@@ -433,7 +452,13 @@ function EscalationFields({ value, onChange, compact = false }) {
       </label>
       <label>
         <span>Responsable</span>
-        <input value={value.assignedTo || ''} onChange={e => onChange('assignedTo', e.target.value)} placeholder="Quien lo resuelve" />
+        <select value={value.assignedTo || ''} onChange={e => onChange('assignedTo', e.target.value)}>
+          <option value="">Sin asignar</option>
+          {responsibleOptions.map(name => <option key={name} value={name}>{name}</option>)}
+          {value.assignedTo && !responsibleOptions.some(name => normalizeKey(name) === normalizeKey(value.assignedTo)) && (
+            <option value={value.assignedTo}>{value.assignedTo} (anterior)</option>
+          )}
+        </select>
       </label>
       <label>
         <span>Fecha compromiso</span>
@@ -470,7 +495,7 @@ function EscalationFields({ value, onChange, compact = false }) {
   );
 }
 
-function EscalationModal({ escalation, editing, setEditing, onClose, onSave, onEditChange, onFollowUp, canManage, saving }) {
+function EscalationModal({ escalation, editing, setEditing, onClose, onSave, onEditChange, onFollowUp, responsibleOptions, canManage, saving }) {
   const value = editing || escalation;
   const history = Array.isArray(escalation.history) ? escalation.history : [];
   const followUps = useMemo(() => {
@@ -504,7 +529,7 @@ function EscalationModal({ escalation, editing, setEditing, onClose, onSave, onE
         {editing ? (
           <form className="form-grid" onSubmit={onSave}>
             <div className="form-grid two">
-              <EscalationFields value={value} onChange={onEditChange} />
+              <EscalationFields value={value} onChange={onEditChange} responsibleOptions={responsibleOptions} />
             </div>
             <div className="modal-actions">
               <button className="btn ghost" type="button" onClick={() => setEditing(null)}>Cancelar</button>

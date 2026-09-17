@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bell, Plus, Save, Trash2, UserPlus, Volume2 } from 'lucide-react';
+import { Bell, Plus, Save, Trash2, UserPlus, Volume2, X } from 'lucide-react';
 import { deleteAssistantInvite, listenAssistantInvites, saveAssistantInvite } from '../services/assistantAccountsService';
-import { AREA_LABELS, AREAS, BUTTON_SECTION_OPTIONS, DAYS, normalizeButtonSections } from '../utils/normalize';
+import { AREA_LABELS, AREAS, BUTTON_SECTION_OPTIONS, DAYS, normalizeButtonSections, normalizeKey, normalizeText } from '../utils/normalize';
 import {
   DEFAULT_MANAGER_SETTINGS,
   listenManagerSettings,
@@ -59,6 +59,7 @@ export default function ManagerSettings({ users = [] }) {
   const [assistantInvites, setAssistantInvites] = useState([]);
   const [template, setTemplate] = useState(EMPTY_TEMPLATE);
   const [assistantDraft, setAssistantDraft] = useState(EMPTY_ASSISTANT);
+  const [responsibleDraft, setResponsibleDraft] = useState('');
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -86,6 +87,24 @@ export default function ManagerSettings({ users = [] }) {
 
   function setField(field, value) {
     setSettings(current => ({ ...current, [field]: value }));
+  }
+
+  function addEscalationResponsible() {
+    const name = normalizeText(responsibleDraft);
+    if (!name) return;
+    setSettings(current => {
+      const people = Array.isArray(current.escalationResponsibles) ? current.escalationResponsibles : [];
+      if (people.some(item => normalizeKey(item) === normalizeKey(name))) return current;
+      return { ...current, escalationResponsibles: [...people, name] };
+    });
+    setResponsibleDraft('');
+  }
+
+  function removeEscalationResponsible(name) {
+    setSettings(current => ({
+      ...current,
+      escalationResponsibles: (current.escalationResponsibles || []).filter(item => normalizeKey(item) !== normalizeKey(name))
+    }));
   }
 
   function updateMessage(index, field, value) {
@@ -413,6 +432,49 @@ export default function ManagerSettings({ users = [] }) {
           <div className="right-actions">
             <button className="btn primary" onClick={saveSettings} disabled={saving}>
               <Save size={17} /> {saving ? 'Guardando...' : 'Guardar configuracion'}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="module-card wide">
+        <div className="module-header">
+          <div>
+            <p className="eyebrow">Escalamientos</p>
+            <h2>Lista de responsables</h2>
+          </div>
+          <span className="pill">{(settings.escalationResponsibles || []).length}</span>
+        </div>
+        <div className="settings-body">
+          <p className="muted">Esta lista aparece al registrar o editar un escalamiento. Así el responsable se elige, no se escribe libremente.</p>
+          <div className="responsible-editor">
+            <input
+              value={responsibleDraft}
+              onChange={e => setResponsibleDraft(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addEscalationResponsible();
+                }
+              }}
+              placeholder="Nombre de responsable"
+            />
+            <button className="btn ghost" type="button" onClick={addEscalationResponsible}>
+              <Plus size={16} /> Agregar a la lista
+            </button>
+          </div>
+          <div className="responsible-list">
+            {(settings.escalationResponsibles || []).map(name => (
+              <span className="responsible-chip" key={name}>
+                {name}
+                <button type="button" onClick={() => removeEscalationResponsible(name)} title={`Quitar a ${name}`}><X size={14} /></button>
+              </span>
+            ))}
+            {!(settings.escalationResponsibles || []).length && <p className="muted">Aún no hay responsables adicionales. Las asistentes activas también aparecen automáticamente.</p>}
+          </div>
+          <div className="right-actions">
+            <button className="btn primary" onClick={saveSettings} disabled={saving}>
+              <Save size={17} /> {saving ? 'Guardando...' : 'Guardar responsables'}
             </button>
           </div>
         </div>

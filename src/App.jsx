@@ -322,7 +322,13 @@ export default function App() {
             <CertificatesManager certificates={certificates} currentUserName={currentUserName} canManage={canManageCertificates} />
           )}
           {activeView === 'escalations' && canManageCertificates && (
-            <EscalationsManager escalations={escalations} currentUserName={currentUserName} canManage={canManageCertificates} />
+            <EscalationsManager
+              escalations={escalations}
+              users={users}
+              settings={managerSettings}
+              currentUserName={currentUserName}
+              canManage={canManageCertificates}
+            />
           )}
           {activeView === 'lockers' && canManageCertificates && (
             <LockersManager lockers={lockers} currentUserName={currentUserName} canManage={canManageCertificates} />

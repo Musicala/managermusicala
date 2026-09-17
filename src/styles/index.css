@@ -272,6 +272,13 @@ input:focus, select:focus, textarea:focus { border-color: var(--vivaldi); backgr
 .settings-body { padding: 18px 22px 22px; display: grid; gap: 16px; }
 .template-fields { grid-template-columns: 1.6fr 1fr 1fr 120px; align-items: end; }
 .assistant-account-fields { grid-template-columns: 1fr 1.3fr 1fr 120px; align-items: end; }
+.responsible-editor { display: flex; gap: 10px; align-items: center; max-width: 620px; }
+.responsible-editor input { flex: 1; }
+.responsible-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.responsible-list .muted { width: 100%; margin: 0; }
+.responsible-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #d9d0ff; color: #4b24c9; background: #f4f1ff; border-radius: 999px; padding: 5px 8px 5px 11px; font-size: .86rem; font-weight: 700; }
+.responsible-chip button { display: grid; place-items: center; width: 20px; height: 20px; border: 0; border-radius: 50%; color: #6336da; background: transparent; padding: 0; }
+.responsible-chip button:hover { background: #e3dcff; }
 .subsection-head { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding-top: 8px; border-top: 1.5px solid var(--line); }
 .subsection-head h3 { margin: 0; font-size: 14px; }
 .notification-message-list { display: grid; gap: 12px; }
@@ -413,6 +420,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--vivaldi); backgr
   .widget-grid { grid-template-columns: 1fr; }
   .form-grid.button-fields, .import-box, .template-fields, .assistant-account-fields, .message-fields, .assistant-quick-add { grid-template-columns: 1fr; }
   .assistant-quick-add { margin: 0 18px 18px; }
+  .responsible-editor { align-items: stretch; flex-direction: column; }
   .assistant-account-row { grid-template-columns: 1fr; }
 }
 
