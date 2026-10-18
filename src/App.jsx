@@ -307,7 +307,7 @@ export default function App() {
           )}
 
           {(effectiveProfile.role === ROLES.ADMIN || effectiveProfile.role === ROLES.ASISTENTE) && (
-            <ScheduleWidget schedule={scenarioSchedule} user={effectiveProfile} users={users} settings={managerSettings} />
+            <ScheduleWidget schedule={scenarioSchedule} user={effectiveProfile} settings={managerSettings} />
           )}
 
           {activeView === 'tools' && (
