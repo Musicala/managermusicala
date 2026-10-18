@@ -20,6 +20,13 @@
 }
 
 * { box-sizing: border-box; }
+.admin-breaks { margin-bottom: 18px; }
+.admin-breaks .module-header { flex-wrap: wrap; gap: 12px; }
+.admin-breaks-list { padding: 0 22px 18px; display: grid; gap: 12px; }
+.admin-breaks-person { padding: 12px; border: 1px solid var(--line); border-radius: 12px; display: grid; gap: 8px; }
+.admin-breaks-times { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-break-time { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; background: #f4f1ff; border-radius: 10px; font-size: 13px; }
+.admin-break-time.current { background: #dcfce7; color: #166534; font-weight: 700; }
 body { margin: 0; min-height: 100vh; background: var(--page-bg); }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }

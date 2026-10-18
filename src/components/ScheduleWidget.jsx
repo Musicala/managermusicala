@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bell, Coffee, Timer } from 'lucide-react';
-import { calculateBreaks, getNextBreak, isLunchItem } from '../utils/breaks';
+import { calculateBreaks, getNextBreak, isLunchItem, resolveBreakRules } from '../utils/breaks';
 import { getTodayName, nowMinutes, timeToMinutes, durationLabel } from '../utils/time';
-import { scheduleItemMatchesAssistant } from '../utils/normalize';
+import { DAYS, scheduleItemMatchesAssistant } from '../utils/normalize';
 import { assetUrl } from '../utils/assets';
 
-export default function ScheduleWidget({ schedule, user, settings = {} }) {
+export default function ScheduleWidget({ schedule, user, users = [], settings = {} }) {
+  const [breakDay, setBreakDay] = useState('');
   const [tick, setTick] = useState(Date.now());
   const [inAppNotifications, setInAppNotifications] = useState(() => readStoredNotifications(user));
   const [notificationPermission, setNotificationPermission] = useState(() => {
@@ -149,6 +150,7 @@ export default function ScheduleWidget({ schedule, user, settings = {} }) {
             </div>
           </div>
         </section>
+        <AdminBreaks schedule={schedule} users={users} settings={settings} tick={tick} day={breakDay} onDayChange={setBreakDay} />
         <NotificationStack notifications={inAppNotifications} onDismiss={dismissNotification} />
       </>
     );
@@ -220,6 +222,57 @@ export default function ScheduleWidget({ schedule, user, settings = {} }) {
       </section>
       <NotificationStack notifications={inAppNotifications} onDismiss={dismissNotification} />
     </>
+  );
+}
+
+function AdminBreaks({ schedule, users, settings, tick, day, onDayChange }) {
+  const today = getTodayName(new Date(tick));
+  const selectedDay = day || today;
+  const minute = nowMinutes(new Date(tick));
+  const duration = resolveBreakRules(settings).breakDuration;
+  const assistants = users
+    .filter(person => person.active !== false && person.role === 'asistente')
+    .sort((a, b) => String(a.displayName || a.email).localeCompare(String(b.displayName || b.email), 'es'));
+
+  return (
+    <section className="module-card admin-breaks">
+      <div className="module-header">
+        <div>
+          <p className="eyebrow">Equipo · semana actual</p>
+          <h2>Pausas activas de las asistentes</h2>
+        </div>
+        <label>
+          <span>Día</span>
+          <select value={day} onChange={event => onDayChange(event.target.value)}>
+            <option value="">Hoy · {today}</option>
+            {DAYS.map(name => <option key={name} value={name}>{name}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="admin-breaks-list">
+        {assistants.map(person => {
+          const breaks = calculateBreaks(schedule, person, selectedDay, settings);
+          return (
+            <article className="admin-breaks-person" key={`${person.source || 'user'}:${person.id}`}>
+              <strong>{person.displayName || person.username || person.email}</strong>
+              <div className="admin-breaks-times">
+                {breaks.map(item => {
+                  const start = timeToMinutes(item.startTime);
+                  const end = start + duration;
+                  const isToday = selectedDay === today;
+                  const status = isToday && minute >= start && minute < end ? 'En pausa ahora' : isToday && minute >= end ? 'Finalizada' : 'Programada';
+                  const endTime = `${String(Math.floor(end / 60)).padStart(2, '0')}:${String(end % 60).padStart(2, '0')}`;
+                  return <span className={`admin-break-time ${status === 'En pausa ahora' ? 'current' : ''}`} key={item.id}><Coffee size={16} /> {item.startTime}–{endTime} · {status}</span>;
+                })}
+                {!breaks.length && <span className="muted">Sin pausas calculadas para este día.</span>}
+              </div>
+            </article>
+          );
+        })}
+        {!assistants.length && <p className="muted">No hay asistentes activas registradas.</p>}
+        <p className="muted">Calculadas con el mismo horario y las mismas reglas que ve cada asistente. El estado corresponde a la hora programada.</p>
+      </div>
+    </section>
   );
 }
 
