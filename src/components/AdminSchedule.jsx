@@ -3,7 +3,7 @@ import { Briefcase, CheckCircle2, Circle, Clock, Copy, Link2, Plus, Wand2 } from
 import { createScheduleDateOverride, deleteScheduleDateOverride, deleteScheduleTask, deleteScheduleTasks, duplicateScheduleDay, saveScheduleTask, shiftScheduleTasks, weekDateForDay } from '../services/scheduleService';
 import { DEFAULT_MANAGER_SETTINGS, listenTaskTemplates, saveManagerSettings } from '../services/managerConfigService';
 import { connectHub, hubScheduleForDay, listenHubSchedules, listenHubUser, matchHubMember } from '../services/hubService';
-import { isLunchItem } from '../utils/breaks';
+import { calculateBreaks, isLunchItem } from '../utils/breaks';
 import { DAYS, normalizeKey, scheduleItemMatchesAssistant } from '../utils/normalize';
 import { TIMELINE_END, TIMELINE_START, SLOT_HEIGHT, durationLabel, findOverlaps, layoutOverlaps, minutesToTime, sortSchedule, timeToMinutes } from '../utils/time';
 import { CurrentTimeLine, DayTabs, TimelineCard } from './AssistantSchedule';
@@ -1218,6 +1218,7 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
             ].filter(Boolean);
             const analysis = analysisByAssistant[normalizeKey(assistant.email || assistant.name)];
             const items = analysis?.items || [];
+            const breaks = calculateBreaks(schedule, assistant, day, settings);
             return (
               <div className="timeline-column admin-col" key={keys[0]} style={{ height: `${(TIMELINE_END - TIMELINE_START + 1) * SLOT_HEIGHT * 2}px` }}>
                 {hours.map(hour => <div key={hour} className="hour-line" style={{ top: `${(hour - TIMELINE_START) * SLOT_HEIGHT * 2}px` }} />)}
@@ -1233,6 +1234,7 @@ export default function AdminSchedule({ schedule, allSchedule, users, settings }
                     onMove={handleMoveTask}
                   />
                 ))}
+                {breaks.map(item => <TimelineCard key={item.id} item={item} />)}
               </div>
             );
           })}
