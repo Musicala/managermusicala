@@ -53,7 +53,7 @@ const STATUS_ORDER = ESCALATION_STATUSES.reduce((order, status, index) => {
 
 export default function EscalationsManager({ escalations, users = [], settings = {}, currentUserName, canManage }) {
   const [draft, setDraft] = useState(EMPTY_ESCALATION);
-  const [filters, setFilters] = useState({ search: '', type: '', status: '', priority: '', sort: 'recent' });
+  const [filters, setFilters] = useState({ search: '', type: '', status: '', priority: '', sort: 'status' });
   const [selected, setSelected] = useState(null);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -265,8 +265,8 @@ export default function EscalationsManager({ escalations, users = [], settings =
           <label>
             <span>Organizar por</span>
             <select value={filters.sort} onChange={e => setFilters(current => ({ ...current, sort: e.target.value }))}>
-              <option value="recent">Fecha más reciente</option>
               <option value="status">Estado</option>
+              <option value="recent">Fecha más reciente</option>
             </select>
           </label>
         </div>
