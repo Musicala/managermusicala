@@ -56,6 +56,8 @@ const SOUND_PROFILE_LABELS = {
 export default function ManagerSettings({ users = [] }) {
   const [settings, setSettings] = useState(DEFAULT_MANAGER_SETTINGS);
   const [templates, setTemplates] = useState([]);
+  const templateCategories = [...new Set(['General', 'Comercial', ...templates.map(item => item.category).filter(Boolean)])]
+    .sort((a, b) => a.localeCompare(b, 'es'));
   const [assistantInvites, setAssistantInvites] = useState([]);
   const [template, setTemplate] = useState(EMPTY_TEMPLATE);
   const [assistantDraft, setAssistantDraft] = useState(EMPTY_ASSISTANT);
@@ -672,8 +674,13 @@ export default function ManagerSettings({ users = [] }) {
               <input value={template.name} onChange={e => setTemplate(current => ({ ...current, name: e.target.value }))} placeholder="Llamar interesados nuevos" />
             </label>
             <label>
-              <span>Categoria</span>
-              <input value={template.category} onChange={e => setTemplate(current => ({ ...current, category: e.target.value }))} placeholder="Comercial" />
+              <span>Categoría</span>
+              <select value={template.category} onChange={e => setTemplate(current => ({ ...current, category: e.target.value }))}>
+                {template.category && !templateCategories.includes(template.category) && (
+                  <option value={template.category}>{template.category}</option>
+                )}
+                {templateCategories.map(category => <option key={category} value={category}>{category}</option>)}
+              </select>
             </label>
             <label>
               <span>Frecuencia</span>
